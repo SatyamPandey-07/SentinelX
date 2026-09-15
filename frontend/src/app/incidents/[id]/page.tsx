@@ -19,7 +19,10 @@ import {
   Hash,
   Database,
   Layers,
-  Sparkles
+  Sparkles,
+  ChevronRight,
+  Shield,
+  Activity
 } from 'lucide-react';
 import { MOCK_INCIDENTS, Incident } from '@/lib/mock-data';
 
@@ -37,7 +40,7 @@ export default function IncidentDetailPage({ params }: { params: { id: string } 
     setIncident({
       ...incident,
       status: 'ACKNOWLEDGED',
-      acknowledged_at: new Date().toISOString()
+      acknowledged_at: "14:34:12"
     });
   };
 
@@ -45,7 +48,7 @@ export default function IncidentDetailPage({ params }: { params: { id: string } 
     setIncident({
       ...incident,
       status: 'RESOLVED',
-      resolved_at: new Date().toISOString()
+      resolved_at: new Date().toLocaleTimeString()
     });
   };
 
@@ -56,235 +59,207 @@ export default function IncidentDetailPage({ params }: { params: { id: string } 
 
     setTimeout(() => {
       setRagAnswer(
-        `According to Campus Emergency Policy SOP-03 (Section 4.2 - Laboratory Spill Exclusion):\n\n"In the event of a volatile chemical or acid spill exceeding 500 mL, evacuate laboratory immediately, close the door, and alert campus safety. Do not attempt cleanup without Level B protective gear. Turn off local HVAC recirculation if accessible, and establish a 100-meter exclusion boundary upwind."\n\nCitation: Campus Chemical & Toxic Fume Containment Protocol (SOP-03) // Relevance Score: 0.94 // Zero Temperature ($T=0.0$)`
+        `According to Medical Emergency & AED Deployment Protocol (SOP-04):\n\n"For unconscious individuals or suspected cardiac arrest: 1) Verify responsiveness and normal breathing. 2) Immediately call Campus Dispatch (ext. 911/5555). 3) Retrieve the nearest Automated External Defibrillator (AED located near central elevators). 4) Begin chest compressions at 100-120 bpm at 2 inches depth until EMS arrives."\n\nCitation: Campus Medical SOP-04 // Section 1.4 // Zero-Temperature ($T=0.0$)`
       );
       setRagLoading(false);
     }, 600);
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
-      {/* Back button & Status bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+    <div className="space-y-6 max-w-6xl mx-auto">
+      
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/[0.08]">
         <div className="flex items-center gap-3">
           <Link
-            href="/incidents"
-            className="p-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-100 transition-colors"
+            href="/dashboard"
+            className="p-2 rounded-lg bg-white/[0.04] border border-white/[0.08] hover:border-white/[0.15] text-slate-400 hover:text-white transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
           </Link>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-mono text-slate-400">DOSSIER:</span>
-              <span className="text-sm font-black font-mono text-slate-100">{incident.id}</span>
-              <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold uppercase ${
-                incident.severity === 'CRITICAL' ? 'bg-red-500/20 text-red-400 border border-red-500/40' :
-                incident.severity === 'HIGH' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40' :
-                'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40'
-              }`}>
-                {incident.severity}
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-red-500/20 text-red-400 font-bold border border-red-500/30">
+                CRITICAL INCIDENT
               </span>
+              <span className="text-base font-black font-mono text-white">{incident.id}</span>
               <span className="text-[10px] px-2 py-0.5 rounded font-mono bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
                 {incident.status}
               </span>
             </div>
-            <h1 className="text-lg font-bold text-slate-100 mt-1">{incident.title}</h1>
+            <h1 className="text-xl font-bold text-white mt-1">{incident.title}</h1>
           </div>
         </div>
 
-        {/* Operational Quick Actions */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {incident.status !== 'RESOLVED' && (
             <>
               {incident.status !== 'ACKNOWLEDGED' && (
                 <button
                   onClick={handleAcknowledge}
-                  className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-slate-950 text-xs font-bold font-mono flex items-center gap-1.5 transition-all shadow-md shadow-cyan-600/30"
+                  className="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-slate-950 text-xs font-bold font-mono transition-colors"
                 >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>ACKNOWLEDGE</span>
+                  ACKNOWLEDGE
                 </button>
               )}
               <button
                 onClick={handleResolve}
-                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold font-mono flex items-center gap-1.5 transition-all shadow-md shadow-emerald-600/30"
+                className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold font-mono transition-colors"
               >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>RESOLVE INCIDENT</span>
+                RESOLVE INCIDENT
               </button>
             </>
           )}
         </div>
       </div>
 
-      {/* ========================================================
-          INCIDENT DETAIL BENTO GRID
-          ======================================================== */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+      {/* 2-Column Incident Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-        {/* BENTO 1: INCIDENT SUMMARY & NARRATIVE (Col 8) */}
-        <div className="md:col-span-12 lg:col-span-8 bento-card space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-            <span className="text-[11px] font-mono tracking-widest text-slate-300 uppercase font-bold flex items-center gap-1.5">
-              <FileText className="w-4 h-4 text-cyan-400" />
-              TRIAGE BRIEFING &amp; DISPATCH CONTEXT
-            </span>
-            <span className="text-[10px] font-mono text-slate-400">
-              REPORTER: {incident.reporter_id}
-            </span>
-          </div>
-
-          <div>
-            <h2 className="text-base font-bold text-slate-100">{incident.title}</h2>
-            <p className="text-xs text-slate-300 mt-2 leading-relaxed whitespace-pre-line bg-slate-950/70 p-4 rounded-xl border border-slate-800/80 font-mono">
-              {incident.description}
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-xs font-mono">
-            <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
-              <span className="text-slate-500 text-[10px] uppercase block">Location Coordinates</span>
-              <span className="text-slate-200 font-bold block">{incident.location.building}</span>
-              <span className="text-slate-400 text-[11px]">{incident.location.floor} // {incident.location.zone_id}</span>
-            </div>
-            <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
-              <span className="text-slate-500 text-[10px] uppercase block">Category &amp; Hazard</span>
-              <span className="text-cyan-400 font-bold block">{incident.category}</span>
-              <span className="text-slate-400 text-[11px]">Level 2 Response</span>
-            </div>
-            <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
-              <span className="text-slate-500 text-[10px] uppercase block">Outbox Transaction</span>
-              <span className="text-emerald-400 font-bold block">COMMITTED</span>
-              <span className="text-slate-400 text-[11px]">Kafka ACK Verified</span>
-            </div>
-          </div>
-        </div>
-
-        {/* BENTO 2: SLA MONITOR & TELEMETRY (Col 4) */}
-        <div className="md:col-span-12 lg:col-span-4 bento-card bento-card-info flex flex-col justify-between">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-cyan-950/60">
-              <span className="text-[11px] font-mono tracking-widest text-cyan-300 uppercase font-bold flex items-center gap-1.5">
-                <Clock className="w-4 h-4 text-cyan-400" />
-                SLA EVALUATION
+        {/* LEFT (7 Cols): TIMELINE & AI CLASSIFICATION */}
+        <div className="lg:col-span-7 space-y-6">
+          
+          {/* AI Classification Dossier */}
+          <div className="p-5 rounded-xl border border-white/[0.08] bg-[#0A0D14] space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-white/[0.08]">
+              <span className="text-xs font-mono font-bold text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-purple-400" />
+                AI CLASSIFICATION &amp; SAFETY REASONING
               </span>
-              <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-mono border border-cyan-500/30">
-                ACTIVE
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-950/40 text-purple-300 border border-purple-500/30">
+                CONFIDENCE: {incident.ai_confidence || 97.4}%
               </span>
             </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs font-mono">
-                <span className="text-slate-400">Target Ack SLA:</span>
-                <span className="text-slate-200 font-bold">2 minutes (CRITICAL)</span>
+            <div className="grid grid-cols-2 gap-3 text-xs font-mono">
+              <div className="p-3 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                <span className="text-slate-500 text-[10px] block">CATEGORY</span>
+                <span className="text-white font-bold">{incident.category} Emergency</span>
               </div>
-              <div className="flex items-center justify-between text-xs font-mono">
-                <span className="text-slate-400">Deadline Score:</span>
-                <span className="text-cyan-400 font-mono">Redis ZSET (ms)</span>
+              <div className="p-3 rounded-lg bg-red-950/20 border border-red-500/30">
+                <span className="text-red-400 text-[10px] block">SEVERITY</span>
+                <span className="text-red-400 font-bold">{incident.severity}</span>
               </div>
-              <div className="flex items-center justify-between text-xs font-mono">
-                <span className="text-slate-400">Warning Threshold:</span>
-                <span className="text-amber-300">80% of elapsed time</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-3 border-t border-cyan-950/60 mt-4">
-            <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1">
-              <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-400 uppercase">
-                <Hash className="w-3.5 h-3.5 text-purple-400" />
-                <span>Cryptographic Audit Hash Chain</span>
-              </div>
-              <p className="text-[10px] font-mono text-purple-300 break-all">
-                SHA256: 8a94bc12f...4d91e80
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* BENTO 3: ASSIGNED UNIT STATUS (Col 4) */}
-        <div className="md:col-span-12 lg:col-span-4 bento-card bento-card-success flex flex-col justify-between">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-emerald-950/60">
-              <span className="text-[11px] font-mono tracking-widest text-emerald-300 uppercase font-bold flex items-center gap-1.5">
-                <UserCheck className="w-4 h-4 text-emerald-400" />
-                DISPATCHED UNIT
-              </span>
-              <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono border border-emerald-500/30 flex items-center gap-1">
-                <Lock className="w-3 h-3 text-emerald-400" />
-                LOCKED
-              </span>
-            </div>
-
-            <div>
-              <h3 className="text-base font-bold text-slate-100 font-mono">
-                {incident.assigned_responder_name || 'Captain Elena Vance'}
-              </h3>
-              <p className="text-xs text-slate-400 font-mono mt-0.5">Specialization: FIRE / HAZMAT</p>
             </div>
 
             <div className="space-y-1.5 text-xs font-mono">
-              <div className="flex items-center justify-between text-slate-400">
-                <span>Dispatch Distance:</span>
-                <span className="text-slate-200">180m (Haversine gRPC)</span>
-              </div>
-              <div className="flex items-center justify-between text-slate-400">
-                <span>Concurrency Mutex:</span>
-                <span className="text-emerald-400">Redis SETNX (10s TTL)</span>
-              </div>
+              <span className="text-slate-400 font-bold">RECOMMENDED ACTIONS:</span>
+              <ul className="space-y-1.5">
+                {(incident.recommended_actions || [
+                  "Dispatch medical responder and campus EMS with AED kit",
+                  "Notify campus security to secure building perimeter and elevator priority",
+                  "Keep nearby hallway and stairwell clear for paramedic stretcher access"
+                ]).map((act, i) => (
+                  <li key={i} className="text-slate-300 flex items-start gap-2 text-[11px]">
+                    <span className="text-cyan-400 font-bold font-mono">{i + 1}.</span>
+                    <span>{act}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="p-3.5 rounded-lg bg-[#080B10] border border-slate-800 text-[11px] font-mono space-y-1">
+              <span className="text-slate-400 font-bold uppercase block text-[10px]">AI REASONING:</span>
+              <p className="text-slate-300 leading-relaxed text-[10px]">
+                {incident.ai_reasoning || "Matched high-consequence medical pattern 'unconscious' and 'shallow breathing'. Deterministic rule applied instant CRITICAL severity triage."}
+              </p>
             </div>
           </div>
 
-          <div className="pt-3 border-t border-emerald-950/60 text-[11px] font-mono text-emerald-400">
-            Status: EN_ROUTE TO SCENE
+          {/* Incident Timeline */}
+          <div className="p-5 rounded-xl border border-white/[0.08] bg-[#0A0D14] space-y-4">
+            <span className="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5 pb-3 border-b border-white/[0.08]">
+              <Clock className="w-4 h-4 text-cyan-400" />
+              INCIDENT EVENT TIMELINE
+            </span>
+
+            <div className="space-y-4 relative before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-white/[0.08] pl-6">
+              {(incident.timeline || [
+                { timestamp: "14:32", title: "Incident reported", description: "Submitted via campus emergency mobile app", actor: "usr-student-89" },
+                { timestamp: "14:32", title: "AI classified", description: "Classified as CRITICAL MEDICAL (Confidence 97.4%)", actor: "VIGIL AI Engine" },
+                { timestamp: "14:33", title: "Responder assigned", description: "Automated scoring matched nearest unit #R-104 (320m)", actor: "Assignment Service" },
+                { timestamp: "14:34", title: "Incident acknowledged", description: "Responder #R-104 confirmed dispatch en route", actor: "Responder #R-104" },
+                { timestamp: "14:38", title: "Responder arrived", description: "Unit on scene at Engineering Block A, Floor 2", actor: "Responder #R-104" }
+              ]).map((t, idx) => (
+                <div key={idx} className="relative space-y-1 text-xs font-mono">
+                  <div className="absolute -left-[31px] top-1 w-2.5 h-2.5 rounded-full bg-cyan-400 border-2 border-[#0A0D14]"></div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-cyan-400 font-bold">{t.timestamp}</span>
+                    <span className="text-white font-bold">{t.title}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400">{t.description}</p>
+                </div>
+              ))}
+            </div>
           </div>
+
         </div>
 
-        {/* BENTO 4: GROUNDED RAG KNOWLEDGE ASSISTANT (Col 8) */}
-        <div className="md:col-span-12 lg:col-span-8 bento-card space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-            <div className="flex items-center gap-2">
-              <Bot className="w-4 h-4 text-cyan-400" />
-              <h2 className="text-sm font-bold tracking-wider text-slate-200 uppercase font-mono">
-                GROUNDED RAG EMERGENCY ASSISTANT (QDRANT VECTOR DB)
-              </h2>
-            </div>
-            <span className="text-[10px] px-2.5 py-0.5 rounded bg-slate-800 text-cyan-400 font-mono border border-slate-700">
-              ZERO-TEMP (T=0.0)
+        {/* RIGHT (5 Cols): LOCATION & VIGIL KNOWLEDGE ASSISTANT */}
+        <div className="lg:col-span-5 space-y-6">
+          
+          {/* Assigned Unit & Location */}
+          <div className="p-5 rounded-xl border border-white/[0.08] bg-[#0A0D14] space-y-4">
+            <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5 pb-3 border-b border-white/[0.08]">
+              <UserCheck className="w-4 h-4 text-emerald-400" />
+              ASSIGNED RESPONDER // #R-104
             </span>
+
+            <div className="space-y-2 text-xs font-mono">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Responder Name:</span>
+                <span className="text-white font-bold">Officer Marcus Vance</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Certification:</span>
+                <span className="text-emerald-400">Paramedic / Trauma Triage</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Location:</span>
+                <span className="text-cyan-400">{incident.location.building} (Floor 2)</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">SLA Remaining:</span>
+                <span className="text-cyan-400 font-bold">01:24 remaining</span>
+              </div>
+            </div>
           </div>
 
-          <p className="text-xs text-slate-400">
-            Ask operational containment protocols, evacuation parameters, or SOP checklists. Answers are strictly grounded in official campus emergency binders.
-          </p>
-
-          <form onSubmit={handleRagSubmit} className="flex gap-2">
-            <input
-              type="text"
-              value={ragQuery}
-              onChange={(e) => setRagQuery(e.target.value)}
-              placeholder="e.g. How to neutralize acid spill in chemistry laboratory?"
-              className="flex-1 px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono"
-            />
-            <button
-              type="submit"
-              disabled={ragLoading}
-              className="px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold text-xs font-mono flex items-center gap-1.5 transition-colors disabled:opacity-50"
-            >
-              <Send className="w-3.5 h-3.5" />
-              <span>{ragLoading ? 'SEARCHING...' : 'QUERY SOP'}</span>
-            </button>
-          </form>
-
-          {ragAnswer && (
-            <div className="p-4 rounded-xl bg-slate-950/80 border border-cyan-500/30 text-xs text-slate-300 font-mono space-y-2">
-              <div className="flex items-center gap-1.5 text-cyan-400 font-bold uppercase text-[11px]">
-                <ShieldCheck className="w-4 h-4 text-cyan-400" />
-                VERIFIED EMERGENCY PROTOCOL
-              </div>
-              <p className="leading-relaxed whitespace-pre-line text-slate-200">{ragAnswer}</p>
+          {/* VIGIL Intelligence Grounded Assistant */}
+          <div className="p-5 rounded-xl border border-white/[0.08] bg-[#0A0D14] space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-white/[0.08]">
+              <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Bot className="w-4 h-4 text-cyan-400" />
+                VIGIL INTELLIGENCE (GROUNDED RAG)
+              </span>
+              <span className="text-[10px] font-mono text-slate-500">QDRANT VECTORS</span>
             </div>
-          )}
+
+            <form onSubmit={handleRagSubmit} className="space-y-2">
+              <input
+                type="text"
+                value={ragQuery}
+                onChange={(e) => setRagQuery(e.target.value)}
+                placeholder="Ask emergency SOP (e.g. cardiac arrest protocol)..."
+                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-white placeholder-slate-500 font-mono focus:outline-none focus:border-cyan-500"
+              />
+              <button
+                type="submit"
+                disabled={ragLoading}
+                className="w-full py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold text-xs font-mono transition-colors disabled:opacity-50"
+              >
+                {ragLoading ? 'QUERYING KNOWLEDGE BASE...' : 'QUERY SOP CHECKLIST'}
+              </button>
+            </form>
+
+            {ragAnswer && (
+              <div className="p-3.5 rounded-lg bg-[#080B10] border border-cyan-500/30 text-xs font-mono text-slate-300 space-y-1.5">
+                <span className="text-cyan-400 font-bold text-[10px] uppercase block">RECOMMENDED RESPONSE</span>
+                <p className="text-[11px] leading-relaxed whitespace-pre-line text-slate-200">{ragAnswer}</p>
+              </div>
+            )}
+          </div>
+
         </div>
 
       </div>

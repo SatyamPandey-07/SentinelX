@@ -6,344 +6,364 @@ import {
   Flame, 
   HeartPulse, 
   ShieldAlert, 
-  AlertTriangle, 
   Clock, 
   CheckCircle2, 
   UserCheck, 
   Radio, 
-  TrendingUp, 
-  ChevronRight,
   Plus,
   Cpu,
   Lock,
-  Database,
   MapPin,
   Activity,
+  ArrowRight,
+  Send,
+  AlertTriangle,
+  ChevronRight,
+  Shield,
+  Crosshair,
   Layers,
-  Zap
+  Sparkles
 } from 'lucide-react';
-import { MOCK_INCIDENTS, MOCK_RESPONDERS } from '@/lib/mock-data';
+import { MOCK_INCIDENTS, MOCK_RESPONDERS, Incident } from '@/lib/mock-data';
 
 export default function DashboardPage() {
-  const [incidents, setIncidents] = useState(MOCK_INCIDENTS);
+  const [incidents, setIncidents] = useState<Incident[]>(MOCK_INCIDENTS);
   const [responders, setResponders] = useState(MOCK_RESPONDERS);
+  const [selectedIncident, setSelectedIncident] = useState<Incident>(MOCK_INCIDENTS[0]);
+  const [activeTab, setActiveTab] = useState<'MAP' | 'ROSTER'>('MAP');
 
-  const criticalCount = incidents.filter(i => i.severity === 'CRITICAL' && i.status !== 'RESOLVED').length;
-  const availableResponders = responders.filter(r => r.status === 'AVAILABLE').length;
+  const handleAction = (actionType: 'ACKNOWLEDGE' | 'ESCALATE' | 'RESOLVE') => {
+    if (!selectedIncident) return;
+    let newStatus = selectedIncident.status;
+    let newSeverity = selectedIncident.severity;
+
+    if (actionType === 'ACKNOWLEDGE') newStatus = 'ACKNOWLEDGED';
+    if (actionType === 'RESOLVE') newStatus = 'RESOLVED';
+    if (actionType === 'ESCALATE') newSeverity = 'CRITICAL';
+
+    const updated = {
+      ...selectedIncident,
+      status: newStatus,
+      severity: newSeverity,
+      acknowledged_at: actionType === 'ACKNOWLEDGE' ? new Date().toISOString() : selectedIncident.acknowledged_at,
+      resolved_at: actionType === 'RESOLVE' ? new Date().toISOString() : selectedIncident.resolved_at
+    };
+
+    setSelectedIncident(updated);
+    setIncidents(incidents.map(i => i.id === updated.id ? updated : i));
+  };
 
   return (
-    <div className="space-y-6">
-      {/* Top Tactical Command Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800/80">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-xl font-black tracking-wider text-slate-100 uppercase font-mono">
-              COMMAND TELEMETRY GRID
+    <div className="space-y-4">
+      
+      {/* Top Telemetry Ticker */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-white/[0.08]">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping"></span>
+            <h1 className="text-base font-black tracking-widest text-white uppercase font-mono">
+              VIGIL // INCIDENT COMMAND CENTER
             </h1>
-            <span className="flex h-2.5 w-2.5 relative">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-            </span>
           </div>
-          <p className="text-xs text-slate-400 font-mono mt-1 flex items-center gap-2 flex-wrap">
-            <span>CLUSTER: KRaft-01</span>
-            <span className="text-slate-600">/</span>
-            <span>OUTBOX: DRAINED (0 LAG)</span>
-            <span className="text-slate-600">/</span>
-            <span>REDIS MUTEX: ENGAGED</span>
-          </p>
+          <span className="text-[11px] px-2 py-0.5 rounded bg-white/[0.04] border border-white/[0.08] text-slate-400 font-mono">
+            DEFCON 2 // REAL-TIME ACTIVE
+          </span>
         </div>
 
-        <div className="flex items-center gap-3">
-          <Link
-            href="/incidents"
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold font-mono tracking-wider transition-all shadow-lg shadow-red-600/30 hover:shadow-red-600/50"
-          >
-            <Plus className="w-4 h-4" />
-            <span>REPORT INCIDENT</span>
-          </Link>
+        <div className="flex items-center gap-3 text-xs font-mono text-slate-400">
+          <span>ACTIVE: <strong className="text-white">12</strong></span>
+          <span className="text-slate-600">/</span>
+          <span>RESPONDERS: <strong className="text-emerald-400">148</strong></span>
+          <span className="text-slate-600">/</span>
+          <span>SLA: <strong className="text-cyan-400">98.7%</strong></span>
         </div>
       </div>
 
       {/* ========================================================
-          BENTO GRID ARCHITECTURE (12-Column Responsive Layout)
+          3-COLUMN ENTERPRISE COMMAND CENTER LAYOUT
           ======================================================== */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 auto-rows-fr">
-
-        {/* BENTO 1: CRITICAL TRIAGE (Col Span 4) */}
-        <div className="md:col-span-12 lg:col-span-4 bento-card bento-card-critical flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono tracking-widest text-red-400 uppercase font-bold flex items-center gap-1.5">
-              <Flame className="w-4 h-4 text-red-500 animate-pulse" />
-              PRIORITY 1 ESCALATIONS
-            </span>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 font-mono border border-red-500/30">
-              URGENT
-            </span>
-          </div>
-
-          <div className="my-4 flex items-baseline gap-3">
-            <span className="text-4xl font-black text-red-400 font-mono">{criticalCount}</span>
-            <span className="text-xs text-red-300/80 font-mono">ACTIVE SCENES REQUIRING DISPATCH</span>
-          </div>
-
-          <div className="pt-3 border-t border-red-950/60 flex items-center justify-between text-[11px] font-mono text-slate-400">
-            <span className="flex items-center gap-1 text-slate-300">
-              <ShieldAlert className="w-3.5 h-3.5 text-red-400" />
-              Hazard: Chem Solvent Spill
-            </span>
-            <span className="text-red-400 font-bold">Zone North (Bldg 3)</span>
-          </div>
-        </div>
-
-        {/* BENTO 2: RESPONDER FLEET & MUTEX LOCK (Col Span 4) */}
-        <div className="md:col-span-12 sm:col-span-6 lg:col-span-4 bento-card bento-card-success flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono tracking-widest text-emerald-400 uppercase font-bold flex items-center gap-1.5">
-              <UserCheck className="w-4 h-4 text-emerald-400" />
-              RESPONDER READINESS
-            </span>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono border border-emerald-500/30 flex items-center gap-1">
-              <Lock className="w-3 h-3 text-emerald-400" />
-              MUTEX ACTIVE
-            </span>
-          </div>
-
-          <div className="my-4 flex items-baseline gap-2">
-            <span className="text-4xl font-black text-emerald-400 font-mono">{availableResponders}</span>
-            <span className="text-base text-slate-400 font-mono">/ {responders.length}</span>
-            <span className="text-xs text-emerald-400/80 font-mono ml-2">UNITS IN STANDBY</span>
-          </div>
-
-          <div className="pt-3 border-t border-emerald-950/60 flex items-center justify-between text-[11px] font-mono text-slate-400">
-            <span>Concurrent Lock: Redis SETNX</span>
-            <span className="text-emerald-300">0 Double Dispatches</span>
-          </div>
-        </div>
-
-        {/* BENTO 3: SLA ENGINE (Col Span 4) */}
-        <div className="md:col-span-12 sm:col-span-6 lg:col-span-4 bento-card bento-card-info flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono tracking-widest text-cyan-400 uppercase font-bold flex items-center gap-1.5">
-              <Clock className="w-4 h-4 text-cyan-400" />
-              SLA TIMER ENGINE
-            </span>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-mono border border-cyan-500/30">
-              NON-POLLING
-            </span>
-          </div>
-
-          <div className="my-4 flex items-baseline gap-3">
-            <span className="text-4xl font-black text-cyan-300 font-mono">98.4%</span>
-            <span className="text-xs text-emerald-400 font-mono">+1.2% COMPLIANCE</span>
-          </div>
-
-          <div className="pt-3 border-t border-cyan-950/60 flex items-center justify-between text-[11px] font-mono text-slate-400">
-            <span>Score: Redis ZSET (ms)</span>
-            <span className="text-cyan-400">P95 MTTA: 1.8m</span>
-          </div>
-        </div>
-
-        {/* BENTO 4: MAIN TACTICAL INCIDENT PIPELINE (Col Span 8, Row Span 2) */}
-        <div className="md:col-span-12 lg:col-span-8 bento-card flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
-              <div className="flex items-center gap-2">
-                <Radio className="w-4 h-4 text-cyan-400 animate-pulse" />
-                <h2 className="text-sm font-bold tracking-wider text-slate-200 uppercase font-mono">
-                  LIVE INCIDENT PIPELINE
-                </h2>
-              </div>
-              <Link 
-                href="/incidents" 
-                className="text-xs text-slate-400 hover:text-cyan-300 flex items-center gap-1 font-mono transition-colors"
-              >
-                <span>VIEW ROSTER</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </Link>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 h-[calc(100vh-9.5rem)]">
+        
+        {/* ========================================================
+            LEFT COLUMN (3 COLS): INCIDENT STREAM LIST
+            ======================================================== */}
+        <div className="lg:col-span-4 rounded-xl border border-white/[0.08] bg-[#0A0D14] p-4 flex flex-col justify-between overflow-hidden">
+          <div className="space-y-3 flex-1 flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between pb-2 border-b border-white/[0.08]">
+              <span className="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                <Radio className="w-3.5 h-3.5 text-red-400 animate-pulse" />
+                ACTIVE INCIDENT QUEUE
+              </span>
+              <span className="text-[10px] font-mono text-slate-500">
+                {incidents.length} STREAMING
+              </span>
             </div>
 
-            <div className="space-y-3">
-              {incidents.slice(0, 3).map((incident) => {
-                const isCritical = incident.severity === 'CRITICAL';
+            {/* Scrollable Incident Cards List */}
+            <div className="space-y-2.5 overflow-y-auto pr-1 flex-1">
+              {incidents.map((inc) => {
+                const isSelected = selectedIncident?.id === inc.id;
+                const isCrit = inc.severity === 'CRITICAL';
+
                 return (
-                  <div
-                    key={incident.id}
-                    className={`p-4 rounded-xl border transition-all ${
-                      isCritical
-                        ? 'bg-red-950/20 border-red-800/50 hover:border-red-600'
-                        : 'bg-slate-900/80 border-slate-800/90 hover:border-slate-700'
+                  <button
+                    key={inc.id}
+                    onClick={() => setSelectedIncident(inc)}
+                    className={`w-full text-left p-3 rounded-lg border transition-all ${
+                      isSelected
+                        ? 'border-cyan-500/80 bg-cyan-950/20 shadow-lg shadow-cyan-500/10'
+                        : isCrit
+                        ? 'border-red-900/60 bg-red-950/15 hover:border-red-700/80'
+                        : 'border-white/[0.06] bg-white/[0.02] hover:border-white/[0.15]'
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="space-y-1.5 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs font-mono font-black text-slate-300">{incident.id}</span>
-                          <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold uppercase ${
-                            incident.severity === 'CRITICAL' ? 'bg-red-500/20 text-red-400 border border-red-500/40' :
-                            incident.severity === 'HIGH' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40' :
-                            'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40'
-                          }`}>
-                            {incident.severity}
-                          </span>
-                          <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono">
-                            {incident.category}
-                          </span>
-                          <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800/80 text-emerald-400 font-mono border border-emerald-500/30">
-                            {incident.status}
-                          </span>
-                        </div>
-
-                        <h3 className="text-sm font-bold text-slate-100">{incident.title}</h3>
-                        <p className="text-xs text-slate-400 line-clamp-1">{incident.description}</p>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-mono font-black text-slate-300">{inc.id}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`text-[9px] px-1.5 py-0.2 rounded font-mono font-bold uppercase ${
+                          inc.severity === 'CRITICAL' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
+                          inc.severity === 'HIGH' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+                          'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
+                        }`}>
+                          {inc.severity}
+                        </span>
+                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-900 text-slate-400 font-mono">
+                          {inc.category}
+                        </span>
                       </div>
-
-                      <Link
-                        href={`/incidents/${incident.id}`}
-                        className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-cyan-950/80 hover:text-cyan-300 text-slate-200 text-xs font-mono font-bold transition-all border border-slate-700 shrink-0"
-                      >
-                        TRIAGE &rarr;
-                      </Link>
                     </div>
 
-                    <div className="mt-3 pt-2.5 border-t border-slate-800/60 flex items-center justify-between text-[11px] font-mono text-slate-400 flex-wrap gap-2">
-                      <span className="text-slate-300 flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5 text-cyan-400" />
-                        {incident.location.building} (Floor {incident.location.floor})
+                    <h3 className="text-xs font-bold text-slate-100 mt-1.5 truncate">{inc.title}</h3>
+                    
+                    <div className="mt-2 pt-2 border-t border-white/[0.04] flex items-center justify-between text-[10px] font-mono text-slate-400">
+                      <span className="text-slate-300 flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-cyan-400" />
+                        {inc.location.building}
                       </span>
-                      <span className="text-cyan-400">UNIT: {incident.assigned_responder_name || 'AUTO-DISPATCHING...'}</span>
+                      <span className="text-amber-400 font-bold">
+                        {inc.status}
+                      </span>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
           </div>
-        </div>
 
-        {/* BENTO 5: AI SAFETY GUARDRAILS & RAG (Col Span 4) */}
-        <div className="md:col-span-12 lg:col-span-4 bento-card flex flex-col justify-between">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-              <span className="text-[11px] font-mono tracking-widest text-slate-300 uppercase font-bold flex items-center gap-1.5">
-                <Cpu className="w-4 h-4 text-cyan-400" />
-                AI SAFETY DECISION ENGINE
-              </span>
-              <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-mono border border-emerald-500/30">
-                100% PASS
-              </span>
-            </div>
-
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Deterministic regex safety overrides enforce instant CRITICAL triage on life-threatening keywords, bypassing probabilistic hallucination.
-            </p>
-
-            <div className="space-y-2 pt-2">
-              <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 text-xs font-mono">
-                <span className="text-slate-400">Deterministic Safety:</span>
-                <span className="text-emerald-400 font-bold">ENFORCED</span>
-              </div>
-              <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 text-xs font-mono">
-                <span className="text-slate-400">Qdrant Grounded RAG:</span>
-                <span className="text-cyan-300 font-bold">READY (5 SOPs)</span>
-              </div>
-              <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 text-xs font-mono">
-                <span className="text-slate-400">Zero-Shot Confidence:</span>
-                <span className="text-slate-100 font-bold">1.0 (Safety Override)</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-3 border-t border-slate-800 text-[11px] font-mono text-slate-500 flex items-center gap-1.5">
-            <Zap className="w-3.5 h-3.5 text-amber-400" />
-            Strict zero-temperature generation ($T=0.0$)
+          <div className="pt-3 border-t border-white/[0.08] mt-3 flex items-center justify-between text-[11px] font-mono text-slate-500">
+            <span>Event Backbone: Kafka KRaft</span>
+            <span className="text-emerald-400">0 lag</span>
           </div>
         </div>
 
-        {/* BENTO 6: KAFKA EVENT STREAM TELEMETRY (Col Span 4) */}
-        <div className="md:col-span-12 lg:col-span-4 bento-card flex flex-col justify-between">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-              <span className="text-[11px] font-mono tracking-widest text-slate-300 uppercase font-bold flex items-center gap-1.5">
-                <Layers className="w-4 h-4 text-purple-400" />
-                KAFKA EVENT BACKBONE
+        {/* ========================================================
+            CENTER COLUMN (5 COLS): LARGE INTERACTIVE CAMPUS MAP
+            ======================================================== */}
+        <div className="lg:col-span-5 rounded-xl border border-white/[0.08] bg-[#080A0F] p-4 flex flex-col justify-between relative overflow-hidden select-none">
+          
+          {/* Map Top Bar */}
+          <div className="flex items-center justify-between pb-2 border-b border-white/[0.08] z-10 text-xs font-mono">
+            <span className="font-bold text-slate-300 flex items-center gap-1.5">
+              <Crosshair className="w-4 h-4 text-cyan-400" />
+              CAMPUS TACTICAL RADAR &amp; SECTORS
+            </span>
+            <div className="flex items-center gap-3 text-slate-400">
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                <span>Incident</span>
               </span>
-              <span className="text-[10px] px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 font-mono border border-purple-500/30">
-                KRAFT
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                <span>Responder</span>
               </span>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs font-mono">
-                <span className="text-slate-400">Cluster ID:</span>
-                <span className="text-slate-300 font-bold">MkU3OEVBNTcwNT...</span>
-              </div>
-              <div className="flex items-center justify-between text-xs font-mono">
-                <span className="text-slate-400">Partition Key:</span>
-                <span className="text-purple-300">incident_id</span>
-              </div>
-              <div className="flex items-center justify-between text-xs font-mono">
-                <span className="text-slate-400">Consumer Ingestion:</span>
-                <span className="text-emerald-400 font-bold">IDEMPOTENT (0 DUPES)</span>
-              </div>
-              <div className="flex items-center justify-between text-xs font-mono">
-                <span className="text-slate-400">Dead Letter Queue:</span>
-                <span className="text-slate-400">notification.DLQ</span>
-              </div>
             </div>
           </div>
 
-          <div className="pt-3 border-t border-slate-800 text-[11px] font-mono text-slate-400 flex items-center justify-between">
-            <span>Broker Latency: &lt; 2ms</span>
-            <span className="text-emerald-400">HEALTHY</span>
+          {/* Interactive Tactical Canvas Map */}
+          <div className="relative flex-1 w-full my-2 flex items-center justify-center overflow-hidden">
+            {/* Grid Pattern */}
+            <div className="absolute inset-0 bg-[radial-gradient(#38bdf8_1px,transparent_1px)] [background-size:24px_24px] opacity-15 pointer-events-none"></div>
+
+            {/* Radar Scan Circles */}
+            <div className="absolute w-[360px] h-[360px] rounded-full border border-cyan-500/10 pointer-events-none"></div>
+            <div className="absolute w-[220px] h-[220px] rounded-full border border-cyan-500/15 pointer-events-none"></div>
+            <div className="absolute w-[360px] h-[360px] rounded-full pointer-events-none animate-radar-sweep opacity-20 bg-gradient-to-tr from-cyan-500/20 via-transparent to-transparent"></div>
+
+            {/* Geofenced Sector Zones */}
+            <div className="absolute top-4 left-6 w-48 h-28 rounded-lg border border-cyan-500/30 bg-cyan-950/20 p-2 flex flex-col justify-between">
+              <span className="text-[9px] font-mono text-cyan-400 font-bold">ENGINEERING BLOCK A</span>
+              <span className="text-[8px] font-mono text-slate-500">Sector Alpha // Floor 2</span>
+            </div>
+
+            <div className="absolute top-6 right-8 w-44 h-24 rounded-lg border border-slate-700/40 bg-slate-900/20 p-2 flex flex-col justify-between">
+              <span className="text-[9px] font-mono text-slate-300 font-bold">LABORATORY BLOCK B</span>
+              <span className="text-[8px] font-mono text-slate-500">Chemistry Wing</span>
+            </div>
+
+            <div className="absolute bottom-6 left-10 w-44 h-24 rounded-lg border border-emerald-500/30 bg-emerald-950/20 p-2 flex flex-col justify-between">
+              <span className="text-[9px] font-mono text-emerald-400 font-bold">STUDENT UNION</span>
+              <span className="text-[8px] font-mono text-slate-500">Public Quad</span>
+            </div>
+
+            <div className="absolute bottom-4 right-6 w-48 h-28 rounded-lg border border-purple-500/30 bg-purple-950/20 p-2 flex flex-col justify-between">
+              <span className="text-[9px] font-mono text-purple-400 font-bold">MEDICAL CTR</span>
+              <span className="text-[8px] font-mono text-slate-500">Trauma Bay</span>
+            </div>
+
+            {/* Connecting Road Routes */}
+            <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 500 320">
+              <line x1="120" y1="90" x2="380" y2="80" stroke="rgba(255,255,255,0.06)" strokeWidth="1.5" strokeDasharray="3 3" />
+              <line x1="120" y1="90" x2="140" y2="240" stroke="rgba(255,255,255,0.06)" strokeWidth="1.5" strokeDasharray="3 3" />
+              <line x1="140" y1="240" x2="400" y2="250" stroke="rgba(255,255,255,0.06)" strokeWidth="1.5" strokeDasharray="3 3" />
+              
+              {/* Active Dispatch Route to Incident */}
+              <line x1="130" y1="95" x2="220" y2="140" stroke="#EF4444" strokeWidth="2.5" strokeDasharray="4 2" />
+              <circle cx="220" cy="140" r="3" fill="#EF4444" className="animate-ping" />
+            </svg>
+
+            {/* Selected Incident Marker */}
+            <div className="absolute top-16 left-28 z-20 flex flex-col items-center">
+              <div className="w-8 h-8 rounded-full bg-red-600/40 border-2 border-red-500 flex items-center justify-center pulse-critical shadow-lg shadow-red-600/50">
+                <Flame className="w-4 h-4 text-red-400" />
+              </div>
+              <span className="mt-1 px-1.5 py-0.5 rounded bg-red-950/90 border border-red-500/50 text-[8px] font-mono font-bold text-red-300">
+                {selectedIncident.id}
+              </span>
+            </div>
+
+            {/* Responder Markers */}
+            <div className="absolute top-32 left-52 z-20 flex flex-col items-center">
+              <div className="w-6 h-6 rounded-full bg-emerald-500/30 border border-emerald-400 flex items-center justify-center shadow-md">
+                <UserCheck className="w-3.5 h-3.5 text-emerald-300" />
+              </div>
+              <span className="mt-0.5 text-[8px] font-mono font-bold text-emerald-400 bg-slate-950 px-1 rounded">
+                #R-104 (320m)
+              </span>
+            </div>
+
+            <div className="absolute bottom-16 right-36 z-10 flex flex-col items-center opacity-70">
+              <div className="w-5 h-5 rounded-full bg-slate-800 border border-slate-600 flex items-center justify-center">
+                <Shield className="w-3 h-3 text-slate-400" />
+              </div>
+              <span className="text-[7px] font-mono text-slate-500">R-221 (1.2km)</span>
+            </div>
+
+            <div className="absolute top-20 right-24 z-10 flex flex-col items-center">
+              <div className="w-5 h-5 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center">
+                <UserCheck className="w-3 h-3 text-emerald-400" />
+              </div>
+              <span className="text-[7px] font-mono text-emerald-400">R-119 (740m)</span>
+            </div>
+
+          </div>
+
+          <div className="pt-2 border-t border-white/[0.08] flex items-center justify-between text-[10px] font-mono text-slate-400">
+            <span>Location Engine: PostGIS / Haversine gRPC</span>
+            <span className="text-cyan-400">Zone North Geofence Locked</span>
           </div>
         </div>
 
-        {/* BENTO 7: RESPONDER FLEET DEPLOYMENT (Col Span 8) */}
-        <div className="md:col-span-12 lg:col-span-8 bento-card flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
-              <div className="flex items-center gap-2">
-                <Activity className="w-4 h-4 text-emerald-400" />
-                <h2 className="text-sm font-bold tracking-wider text-slate-200 uppercase font-mono">
-                  ACTIVE RESPONDER FLEET MATRIX
-                </h2>
+        {/* ========================================================
+            RIGHT COLUMN (3 COLS): SELECTED INCIDENT ACTION DOSSIER
+            ======================================================== */}
+        <div className="lg:col-span-3 rounded-xl border border-white/[0.08] bg-[#0A0D14] p-4 flex flex-col justify-between overflow-y-auto space-y-4">
+          
+          <div className="space-y-4">
+            {/* Header & Severity */}
+            <div className="flex items-center justify-between pb-3 border-b border-white/[0.08]">
+              <div>
+                <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold uppercase ${
+                  selectedIncident.severity === 'CRITICAL' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
+                  'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                }`}>
+                  {selectedIncident.severity}
+                </span>
+                <h2 className="text-sm font-bold text-white mt-1.5">{selectedIncident.category} Emergency</h2>
               </div>
-              <Link href="/responders" className="text-xs text-slate-400 hover:text-emerald-400 font-mono flex items-center gap-1 transition-colors">
-                <span>MANAGE FLEET</span>
-                <ChevronRight className="w-3.5 h-3.5" />
+              <span className="text-xs font-mono font-bold text-slate-400">{selectedIncident.id}</span>
+            </div>
+
+            {/* Telemetry Dossier Parameters */}
+            <div className="space-y-2.5 text-xs font-mono">
+              <div className="flex justify-between p-2 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                <span className="text-slate-400">Location:</span>
+                <span className="text-slate-100 font-bold">{selectedIncident.location.building}</span>
+              </div>
+
+              <div className="flex justify-between p-2 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                <span className="text-slate-400">Reported:</span>
+                <span className="text-slate-200">{selectedIncident.created_at}</span>
+              </div>
+
+              <div className="flex justify-between p-2 rounded-lg bg-purple-950/20 border border-purple-500/30">
+                <span className="text-purple-300">AI Confidence:</span>
+                <span className="text-purple-400 font-bold">{selectedIncident.ai_confidence || 97.4}%</span>
+              </div>
+
+              <div className="flex justify-between p-2 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                <span className="text-slate-400">Assigned:</span>
+                <span className="text-cyan-400 font-bold">Responder #R-104</span>
+              </div>
+
+              <div className="flex justify-between p-2 rounded-lg bg-cyan-950/20 border border-cyan-500/30">
+                <span className="text-cyan-300 flex items-center gap-1">
+                  <Clock className="w-3 h-3 text-cyan-400" />
+                  SLA:
+                </span>
+                <span className="text-cyan-400 font-bold">01:24 remaining</span>
+              </div>
+
+              <div className="flex justify-between p-2 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+                <span className="text-slate-400">Status:</span>
+                <span className="text-emerald-400 font-bold">{selectedIncident.status}</span>
+              </div>
+            </div>
+
+            {/* AI Reasoning Insight */}
+            <div className="p-3 rounded-lg bg-[#0E131E] border border-slate-800 text-[11px] font-mono space-y-1">
+              <span className="text-purple-400 font-bold uppercase block flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-purple-400" />
+                AI REASONING
+              </span>
+              <p className="text-slate-300 leading-relaxed text-[10px]">
+                {selectedIncident.ai_reasoning || "High-consequence pattern verified. Deterministic safety override active."}
+              </p>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="space-y-2 pt-3 border-t border-white/[0.08]">
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => handleAction('ACKNOWLEDGE')}
+                className="py-2 px-3 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-slate-950 text-xs font-bold font-mono transition-colors"
+              >
+                ACKNOWLEDGE
+              </button>
+              <button
+                onClick={() => handleAction('ESCALATE')}
+                className="py-2 px-3 rounded-lg bg-red-600/80 hover:bg-red-600 text-white text-xs font-bold font-mono transition-colors"
+              >
+                ESCALATE
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <Link
+                href={`/incidents/${selectedIncident.id}`}
+                className="py-2 px-3 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.1] text-slate-200 text-xs font-mono text-center transition-colors"
+              >
+                DETAILS
               </Link>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {responders.map((resp) => (
-                <div key={resp.id} className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-200 font-mono">{resp.name}</span>
-                    <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold ${
-                      resp.status === 'AVAILABLE' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
-                      resp.status === 'EN_ROUTE' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' :
-                      'bg-purple-500/20 text-purple-400 border border-purple-500/30'
-                    }`}>
-                      {resp.status}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {resp.skills.map((skill) => (
-                      <span key={skill} className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">
-                        {skill}
-                      </span>
-                    ))}
-                  </div>
-
-                  <div className="text-[10px] font-mono text-slate-400 flex items-center justify-between pt-1 border-t border-slate-800/60">
-                    <span>ACTIVE LOAD: {resp.active_incidents}</span>
-                    <span className="text-slate-300">TEL: {resp.phone}</span>
-                  </div>
-                </div>
-              ))}
+              <button
+                onClick={() => handleAction('RESOLVE')}
+                className="py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold font-mono transition-colors"
+              >
+                RESOLVE
+              </button>
             </div>
           </div>
+
         </div>
 
       </div>
