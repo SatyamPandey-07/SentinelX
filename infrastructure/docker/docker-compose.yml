@@ -235,10 +235,16 @@ services:
       - sentinelx-net
 
   # ==========================================
-  # Mock Notification Ingestion: MailHog
+  # Mock Notification Ingestion: Mailpit
+  # MailHog itself is unmaintained (archived upstream) and its floating
+  # `:latest` tag now resolves to a broken image that fails to even start
+  # ("unable to find user mailhog" — its own passwd file no longer defines
+  # the user its entrypoint expects). Mailpit is the standard actively
+  # maintained drop-in replacement: same SMTP (1025) + web UI (8025) ports,
+  # same "capture outbound mail for local inspection" role.
   # ==========================================
   mailhog:
-    image: mailhog/mailhog:latest
+    image: axllent/mailpit:v1.21.3
     container_name: sentinelx-mailhog
     restart: unless-stopped
     ports:
@@ -455,12 +461,16 @@ services:
       POSTGRES_USER: sentinelx_admin
       POSTGRES_PASSWORD: sentinelx_secret_password
       ANALYTICS_DB_NAME: sentinelx_analytics
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
     ports:
       - "8089:8089"
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       kafka:
         condition: service_healthy

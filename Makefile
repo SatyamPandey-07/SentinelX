@@ -17,11 +17,16 @@ help:
 	@echo "make k8s-prod         - Apply the prod K8s overlay to the current kubectl context"
 	@echo "make clean            - Clean build artifacts"
 
+# --env-file is required: compose resolves .env relative to the compose
+# file's own directory (infrastructure/docker/), not the repo root where
+# .env actually lives — without this flag, every ${VAR:-default}
+# interpolation (JWT_SECRET, ANTHROPIC_API_KEY, GROQ_API_KEY, ...) silently
+# falls back to its default/empty value instead of reading .env.
 dev:
-	docker compose -f infrastructure/docker/docker-compose.yml up -d
+	docker compose --env-file .env -f infrastructure/docker/docker-compose.yml up -d
 
 down:
-	docker compose -f infrastructure/docker/docker-compose.yml down
+	docker compose --env-file .env -f infrastructure/docker/docker-compose.yml down
 
 build:
 	mvn clean package -DskipTests
@@ -59,4 +64,4 @@ k8s-prod:
 
 clean:
 	mvn clean
-	docker compose -f infrastructure/docker/docker-compose.yml down -v
+	docker compose --env-file .env -f infrastructure/docker/docker-compose.yml down -v

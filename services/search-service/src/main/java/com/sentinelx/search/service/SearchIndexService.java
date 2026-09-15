@@ -2,6 +2,7 @@ package com.sentinelx.search.service;
 
 import com.sentinelx.search.model.IncidentDocument;
 import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.opensearch.client.opensearch.OpenSearchClient;
 import org.opensearch.client.opensearch._types.FieldValue;
 import org.opensearch.client.opensearch._types.SortOrder;
@@ -53,6 +54,14 @@ public class SearchIndexService {
     private final int timeWindowMinutes;
     private final double textSimilarityThreshold;
 
+    // Explicit @Autowired is required here: with two constructors and
+    // neither previously annotated, Spring couldn't disambiguate which one
+    // to use for dependency injection and failed at startup with "No
+    // default constructor found" — it was trying (and failing) to fall
+    // back to a no-arg constructor that doesn't exist. Only ever surfaced
+    // by actually running the container, not by compiling or unit-testing
+    // it (unit tests call the 3-arg constructor directly).
+    @Autowired
     public SearchIndexService(
             @Nullable OpenSearchClient openSearchClient,
             @Value("${opensearch.index-name:sentinelx-incidents}") String indexName,
