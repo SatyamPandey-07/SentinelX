@@ -258,6 +258,7 @@ services:
     build:
       context: ../..
       dockerfile: services/auth-service/Dockerfile
+    image: sentinelx/auth-service:latest
     container_name: sentinelx-auth-service
     restart: unless-stopped
     environment:
@@ -284,6 +285,7 @@ services:
     build:
       context: ../..
       dockerfile: services/incident-service/Dockerfile
+    image: sentinelx/incident-service:latest
     container_name: sentinelx-incident-service
     restart: unless-stopped
     environment:
@@ -312,6 +314,7 @@ services:
     build:
       context: ../..
       dockerfile: services/location-service/Dockerfile
+    image: sentinelx/location-service:latest
     container_name: sentinelx-location-service
     restart: unless-stopped
     environment:
@@ -335,6 +338,7 @@ services:
     build:
       context: ../..
       dockerfile: services/assignment-service/Dockerfile
+    image: sentinelx/assignment-service:latest
     container_name: sentinelx-assignment-service
     restart: unless-stopped
     environment:
@@ -360,6 +364,7 @@ services:
     build:
       context: ../..
       dockerfile: services/sla-service/Dockerfile
+    image: sentinelx/sla-service:latest
     container_name: sentinelx-sla-service
     restart: unless-stopped
     environment:
@@ -381,6 +386,7 @@ services:
     build:
       context: ../..
       dockerfile: services/search-service/Dockerfile
+    image: sentinelx/search-service:latest
     container_name: sentinelx-search-service
     restart: unless-stopped
     environment:
@@ -402,6 +408,7 @@ services:
     build:
       context: ../..
       dockerfile: services/realtime-service/Dockerfile
+    image: sentinelx/realtime-service:latest
     container_name: sentinelx-realtime-service
     restart: unless-stopped
     environment:
@@ -419,6 +426,7 @@ services:
     build:
       context: ../..
       dockerfile: services/notification-service/Dockerfile
+    image: sentinelx/notification-service:latest
     container_name: sentinelx-notification-service
     restart: unless-stopped
     environment:
@@ -438,6 +446,7 @@ services:
     build:
       context: ../..
       dockerfile: services/analytics-service/Dockerfile
+    image: sentinelx/analytics-service:latest
     container_name: sentinelx-analytics-service
     restart: unless-stopped
     environment:
@@ -462,6 +471,7 @@ services:
     build:
       context: ../..
       dockerfile: services/audit-service/Dockerfile
+    image: sentinelx/audit-service:latest
     container_name: sentinelx-audit-service
     restart: unless-stopped
     environment:
@@ -486,6 +496,7 @@ services:
     build:
       context: ../../services/ai-service
       dockerfile: Dockerfile
+    image: sentinelx/ai-service:latest
     container_name: sentinelx-ai-service
     restart: unless-stopped
     environment:
