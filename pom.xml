@@ -138,6 +138,24 @@
                     <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-maven-plugin</artifactId>
                     <version>${spring-boot.version}</version>
+                    <!--
+                        This project does not extend spring-boot-starter-parent (it has its
+                        own sentinelx-parent), so the "repackage" goal that turns `mvn package`
+                        output into a runnable fat jar is NOT auto-bound to the package phase
+                        the way it would be under the standard Spring Boot parent — it must be
+                        declared explicitly. Every service module inherits this execution by
+                        declaring the plugin with no <executions> of its own; without this,
+                        `mvn package` silently produces a jar with no Main-Class manifest entry
+                        that fails at container startup with "no main manifest attribute".
+                    -->
+                    <executions>
+                        <execution>
+                            <id>repackage</id>
+                            <goals>
+                                <goal>repackage</goal>
+                            </goals>
+                        </execution>
+                    </executions>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
