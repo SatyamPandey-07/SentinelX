@@ -4,25 +4,39 @@ kind: Kustomization
 namespace: sentinelx-dev
 
 resources:
-  - ../../base/namespace.yaml
+  - namespace.yaml
   - ../../base/configmap.yaml
-  - ../../base/incident-service-deployment.yaml
+  - ../../base/ai-service-deployment.yaml
+  - ../../base/analytics-service-deployment.yaml
   - ../../base/api-gateway-deployment.yaml
+  - ../../base/assignment-service-deployment.yaml
+  - ../../base/audit-service-deployment.yaml
+  - ../../base/auth-service-deployment.yaml
+  - ../../base/incident-service-deployment.yaml
+  - ../../base/location-service-deployment.yaml
+  - ../../base/notification-service-deployment.yaml
+  - ../../base/realtime-service-deployment.yaml
+  - ../../base/search-service-deployment.yaml
+  - ../../base/sla-service-deployment.yaml
   - ../../base/ingress.yaml
   - ../../base/hpa.yaml
 
+# Dev runs every service at a single replica — HPAs still apply (minReplicas
+# in base is 2/3) so they're patched down too, since a laptop-scale dev
+# cluster shouldn't try to satisfy a 2-3 replica minimum.
 patches:
   - target:
       kind: Deployment
-      name: incident-service
     patch: |-
       - op: replace
         path: /spec/replicas
         value: 1
   - target:
-      kind: Deployment
-      name: api-gateway
+      kind: HorizontalPodAutoscaler
     patch: |-
       - op: replace
-        path: /spec/replicas
+        path: /spec/minReplicas
         value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 2

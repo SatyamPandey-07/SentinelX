@@ -4,9 +4,19 @@ kind: Kustomization
 namespace: sentinelx-prod
 
 resources:
-  - ../../base/namespace.yaml
+  - namespace.yaml
   - ../../base/configmap.yaml
-  - ../../base/incident-service-deployment.yaml
+  - ../../base/ai-service-deployment.yaml
+  - ../../base/analytics-service-deployment.yaml
   - ../../base/api-gateway-deployment.yaml
+  - ../../base/assignment-service-deployment.yaml
+  - ../../base/audit-service-deployment.yaml
+  - ../../base/auth-service-deployment.yaml
+  - ../../base/incident-service-deployment.yaml
+  - ../../base/location-service-deployment.yaml
+  - ../../base/notification-service-deployment.yaml
+  - ../../base/realtime-service-deployment.yaml
+  - ../../base/search-service-deployment.yaml
+  - ../../base/sla-service-deployment.yaml
   - ../../base/ingress.yaml
   - ../../base/hpa.yaml
