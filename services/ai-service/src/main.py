@@ -1,4 +1,6 @@
+import os
 import time
+import logging
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
@@ -13,7 +15,10 @@ from src.schemas import (
     SummarizationResponse
 )
 from src.classifier.ml_classifier import MLClassifier
+from src.classifier.llm_classifier import LLMClassifier
 from src.rag.rag_engine import RagEngine
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="SentinelX AI & Grounded RAG Service",
@@ -34,7 +39,19 @@ CLASSIFICATION_REQUESTS = Counter("ai_classification_requests_total", "Total cla
 CLASSIFICATION_LATENCY = Histogram("ai_classification_duration_seconds", "Classification latency in seconds")
 SAFETY_OVERRIDES_COUNT = Counter("ai_safety_overrides_total", "Total rule-based safety overrides triggered")
 
-classifier = MLClassifier()
+# Provider selection (Section 12): swappable classifier abstraction.
+# AI_CLASSIFIER_PROVIDER=llm|ml|auto (default auto: use the LLM when a key is
+# configured, otherwise the keyword classifier — either way LLMClassifier
+# itself falls back to MLClassifier on any failure, see llm_classifier.py).
+_provider = os.getenv("AI_CLASSIFIER_PROVIDER", "auto").lower()
+if _provider == "ml":
+    classifier = MLClassifier()
+elif _provider == "llm" or (_provider == "auto" and os.getenv("ANTHROPIC_API_KEY")):
+    classifier = LLMClassifier()
+else:
+    classifier = MLClassifier()
+logger.info("ai-service classifier provider: %s", type(classifier).__name__)
+
 rag_engine = RagEngine()
 
 @app.post("/api/v1/ai/classify", response_model=ClassificationResponse)
@@ -74,7 +91,7 @@ def health_check():
         "service": "ai-service",
         "timestamp": time.time(),
         "models": {
-            "classifier": "active",
+            "classifier": type(classifier).__name__,
             "safety_guardrails": "enforced",
             "rag_vector_store": "ready"
         }
