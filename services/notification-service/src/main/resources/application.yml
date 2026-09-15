@@ -4,6 +4,18 @@ server:
 spring:
   application:
     name: notification-service
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
+          connectiontimeout: 3000
+          timeout: 3000
+          writetimeout: 3000
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
@@ -14,6 +26,10 @@ spring:
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+notification:
+  email:
+    from: ${NOTIFICATION_EMAIL_FROM:alerts@sentinelx.local}
 
 management:
   endpoints:
