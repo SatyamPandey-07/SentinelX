@@ -148,7 +148,7 @@ services:
   # Vector Database: Qdrant (RAG & Embeddings)
   # ==========================================
   qdrant:
-    image: qdrant/qdrant:v1.9.0
+    image: qdrant/qdrant:v1.19.0
     container_name: sentinelx-qdrant
     restart: unless-stopped
     ports:
