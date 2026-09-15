@@ -185,7 +185,14 @@ public class IncidentService {
         return response;
     }
 
-    // Cache-aside implementation (Section 9)
+    // Cache-aside implementation (Section 9).
+    // @Transactional is required on the cache-miss path: attachments is a
+    // LAZY @OneToMany, and mapToResponse() calls e.getAttachments() — without
+    // an open Hibernate session spanning that call, it throws
+    // LazyInitializationException ("no Session") for any incident not
+    // already warm in the Redis cache. Only surfaced by an actual GET
+    // against a cold cache, not by unit tests that mock the repository.
+    @Transactional(readOnly = true)
     public IncidentResponse getIncident(String id) {
         String cacheKey = CACHE_KEY_PREFIX + id;
         String cachedJson = redisTemplate.opsForValue().get(cacheKey);
@@ -206,6 +213,7 @@ public class IncidentService {
         return response;
     }
 
+    @Transactional(readOnly = true)
     public Page<IncidentResponse> getIncidents(IncidentStatus status, IncidentSeverity severity, IncidentCategory category, Pageable pageable) {
         return incidentRepository.findFiltered(status, severity, category, pageable)
                 .map(this::mapToResponse);

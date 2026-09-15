@@ -151,8 +151,14 @@ def create_incident(token, title, description, category="OTHER", severity=None, 
 def get_incident(token, incident_id):
     headers = {"Authorization": f"Bearer {token}"}
     r = requests.get(f"{GATEWAY_URL}/api/v1/incidents/{incident_id}", headers=headers, timeout=10)
-    if r.status_code != 200:
+    if r.status_code == 404:
         return None
+    if r.status_code != 200:
+        # A real server error is not "not ready yet" -- surfacing it
+        # immediately previously got masked as an indefinite poll timeout
+        # (a real bug: getIncident()'s cache-miss path threw
+        # LazyInitializationException on the attachments collection).
+        raise E2ETestFailure(f"GET incident {incident_id} failed: {r.status_code} {r.text}")
     return r.json()
 
 
@@ -233,7 +239,13 @@ def test_full_incident_pipeline(token):
         current = get_incident(token, incident_id)
         return current if current and current["status"] == "ASSIGNED" and current["assigned_responder_id"] else None
 
-    assigned = poll_until("incident reaches ASSIGNED status with a responder", is_assigned)
+    # A longer timeout than the other polls: if a consumer in
+    # incident-service-group was recently restarted, Kafka's consumer-group
+    # rebalance protocol makes the *old* member's session time out
+    # (default ~10-20s) before the new member is handed the partition --
+    # a real, expected characteristic of consumer groups, not something to
+    # engineer around here.
+    assigned = poll_until("incident reaches ASSIGNED status with a responder", is_assigned, timeout=40)
     log(f"PASS: assigned to responder {assigned['assigned_responder_id']}, "
         f"SLA ack deadline {assigned['sla_ack_deadline']}")
 

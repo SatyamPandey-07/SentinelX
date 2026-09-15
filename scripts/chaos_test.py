@@ -2,23 +2,43 @@
 """
 SentinelX Chaos & Resilience Engineering Validation Script (Section 23 & 24).
 
-Executes automated failure injection to verify:
+Every test here exercises the REAL running system -- the actual guardrail
+class, the actual live services over HTTP, and the actual Kafka broker
+(stopped/started via Docker) -- not an in-memory simulation of what the
+system would theoretically do. Requires the full stack to be up:
+
+    make dev
+
 1. AI Service Degradation -> Rule-based safety fallback engages.
-2. Kafka Consumer Crash -> Offset replay without lost messages.
-3. Duplicate Message Burst -> Idempotent consumer discards duplicate payloads.
-4. SLA Impact -> Evaluates failover latencies.
+   (Calls the real RuleBasedSafetyGuardrail class directly.)
+2. Duplicate Client Request -> Idempotent incident creation via the real
+   Redis-backed Idempotency-Key mechanism in incident-service.
+   (Two real HTTP POSTs with the same key against the live service.)
+3. Kafka Broker Disconnect During Write -> Transactional Outbox guarantees
+   zero data loss.
+   (Really stops the Kafka container, creates a real incident against a
+   Kafka-less incident-service, confirms the write still succeeds, restarts
+   Kafka, and polls audit-service until the backlogged event actually
+   arrives -- proving the OutboxPublisher's retry loop, not asserting it.)
 """
 
-import time
-import sys
-import os
 import json
-from typing import Dict, Any
+import os
+import subprocess
+import sys
+import time
+import uuid
 
-# Ensure ai-service package path is on sys.path
+import requests
+
+GATEWAY_URL = os.getenv("GATEWAY_URL", "http://localhost:8080")
+AUDIT_SERVICE_URL = os.getenv("AUDIT_SERVICE_URL", "http://localhost:8090")
+KAFKA_CONTAINER = os.getenv("KAFKA_CONTAINER", "sentinelx-kafka")
+
 ai_service_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "services", "ai-service"))
 if ai_service_path not in sys.path:
     sys.path.insert(0, ai_service_path)
+
 
 class ResilienceTestSuite:
 
@@ -33,17 +53,18 @@ class ResilienceTestSuite:
 
     def test_ai_service_outage_fallback(self):
         """
-        Scenario: AI Service becomes unresponsive.
-        Expectation: Incident creation must NOT fail or drop. System applies deterministic safety guardrails.
+        Scenario: an incident matches a life-safety pattern.
+        Expectation: the deterministic guardrail -- the actual fallback path
+        used when the LLM/keyword classifier is unavailable or simply
+        disagrees -- unconditionally forces CRITICAL. This is the real
+        class incident-service's AiClassificationClient and ai-service's own
+        classifiers both defer to; see AI.md / ADR-012.
         """
-        print(">>> Simulating Failure 1: AI Classification Service Timeout / Outage...")
-        time.sleep(0.5)
+        print(">>> Test 1: Deterministic Safety Guardrail (real class, real evaluation)...")
 
-        # Simulation: Emergency incident created while external AI endpoint is unreachable
         sample_title = "Massive explosion and fire in Chemistry wing"
         sample_desc = "Flames visible through roof, multiple people trapped"
 
-        # Deterministic Safety Rule directly in Python/Java
         from src.classifier.rule_guardrail import RuleBasedSafetyGuardrail
         guardrail = RuleBasedSafetyGuardrail()
         override = guardrail.evaluate_override(sample_title, sample_desc)
@@ -51,81 +72,171 @@ class ResilienceTestSuite:
         if override is not None:
             cat, sev, reason, actions = override
             self.log_test(
-                "AI Service Outage Fallback",
+                "AI Service Outage Fallback (deterministic guardrail)",
                 cat.value == "FIRE" and sev.value == "CRITICAL",
-                f"Successfully engaged deterministic safety override: {cat.value} {sev.value}. Reasoning: '{reason}'"
+                f"Guardrail engaged: {cat.value}/{sev.value}. Reasoning: '{reason}'. "
+                f"This is what fires whenever ai-service's LLM path can't be trusted, "
+                f"including a full outage.",
             )
         else:
             self.log_test("AI Service Outage Fallback", False, "Safety guardrail failed to engage")
 
-    def test_duplicate_kafka_message_idempotency(self):
+    def test_duplicate_request_idempotency(self):
         """
-        Scenario: Kafka network replay sends exact same IncidentAssignedEvent 5 times.
-        Expectation: Consumer deduplicates using Redis atomic setnx; processes exactly once.
+        Scenario: a client retries the exact same POST /incidents (e.g.
+        after a timeout it never saw the response to). Expectation: the
+        real Redis-backed Idempotency-Key cache in incident-service
+        (IDEMPOTENCY_KEY_PREFIX) returns the SAME incident both times, and
+        only one incident is actually created -- against the live,
+        currently-running incident-service, not a simulated cache.
         """
-        print(">>> Simulating Failure 2: Duplicate Kafka Event Ingestion Burst...")
-        time.sleep(0.5)
+        print(">>> Test 2: Duplicate Client Request Idempotency (real Redis cache, live service)...")
+        try:
+            token = self._register_and_login()
+            idempotency_key = str(uuid.uuid4())
+            body = {
+                "title": f"Chaos idempotency probe {uuid.uuid4().hex[:8]}",
+                "description": "Verifying duplicate POSTs collapse to one incident",
+                "category": "OTHER",
+                "severity": "LOW",
+                "location": {
+                    "latitude": 37.7749, "longitude": -122.4194,
+                    "building": "Test", "floor": "1", "zone_id": "ZONE_NORTH", "address": "1 Test Way",
+                },
+                "attachment_urls": [],
+            }
+            headers = {"Authorization": f"Bearer {token}", "Idempotency-Key": idempotency_key}
 
-        processed_cache = set()
-        event_id = "evt-uuid-9901-duplicate-test"
-        duplicate_count = 5
-        processed_executions = 0
+            r1 = requests.post(f"{GATEWAY_URL}/api/v1/incidents", json=body, headers=headers, timeout=10)
+            r2 = requests.post(f"{GATEWAY_URL}/api/v1/incidents", json=body, headers=headers, timeout=10)
 
-        for i in range(duplicate_count):
-            if event_id not in processed_cache:
-                processed_cache.add(event_id)
-                processed_executions += 1
-            else:
-                pass # Discarded duplicate
+            if r1.status_code not in (200, 201) or r2.status_code not in (200, 201):
+                self.log_test("Duplicate Request Idempotency", False,
+                               f"Unexpected status codes: {r1.status_code}, {r2.status_code}")
+                return
 
-        self.log_test(
-            "Kafka Consumer Idempotency",
-            processed_executions == 1,
-            f"Received {duplicate_count} duplicate events. Exactly {processed_executions} was executed, {duplicate_count - 1} discarded."
-        )
+            id1, id2 = r1.json()["id"], r2.json()["id"]
+            self.log_test(
+                "Duplicate Request Idempotency (real Redis cache)",
+                id1 == id2,
+                f"Two POSTs with Idempotency-Key={idempotency_key[:8]}... "
+                f"returned incident id {id1} both times" if id1 == id2 else
+                f"DUPLICATE CREATED: first={id1} second={id2}",
+            )
+        except Exception as e:
+            self.log_test("Duplicate Request Idempotency", False, f"Test setup failed: {e}")
 
     def test_outbox_guarantee_under_broker_disconnect(self):
         """
-        Scenario: Kafka broker goes down while user submits incident.
-        Expectation: Database transaction commits (incident + outbox_event).
-        Zero incidents lost. When Kafka recovers, outbox publisher drains backlog.
+        Scenario: Kafka is really stopped mid-write.
+        Expectation (Transactional Outbox, Section 6): the incident INSERT
+        and outbox_event INSERT commit atomically in Postgres regardless of
+        Kafka's availability -- incident creation must still return 201.
+        Once Kafka is restarted, the OutboxPublisher's own retry loop
+        (fixed-delay-ms in incident-service/application.yml) picks the
+        backlogged event up and republishes it, without this script telling
+        it to -- we only poll audit-service until that shows up.
         """
-        print(">>> Simulating Failure 3: Kafka Broker Disconnect During Write...")
-        time.sleep(0.5)
+        print(">>> Test 3: Kafka Broker Disconnect During Write (real docker stop/start)...")
+        marker = f"CHAOS-{uuid.uuid4().hex[:10]}"
+        incident_id = None
+        try:
+            token = self._register_and_login()
 
-        db_committed = True
-        kafka_available = False
-        outbox_status = "PENDING"
-        retry_count = 0
+            print(f"    Stopping {KAFKA_CONTAINER}...")
+            self._docker(["stop", KAFKA_CONTAINER])
 
-        # Simulate outbox retry publisher
-        if not kafka_available:
-            retry_count += 1
-            outbox_status = "PENDING" # Will retry on next scheduled tick
+            body = {
+                "title": f"Outbox resilience probe {marker}",
+                "description": "Created while Kafka is down -- must still persist",
+                "category": "OTHER",
+                "severity": "LOW",
+                "location": {
+                    "latitude": 37.7749, "longitude": -122.4194,
+                    "building": "Test", "floor": "1", "zone_id": "ZONE_NORTH", "address": "1 Test Way",
+                },
+                "attachment_urls": [],
+            }
+            headers = {"Authorization": f"Bearer {token}", "Idempotency-Key": str(uuid.uuid4())}
+            r = requests.post(f"{GATEWAY_URL}/api/v1/incidents", json=body, headers=headers, timeout=15)
 
-        # Recover Kafka
-        kafka_available = True
-        if kafka_available:
-            outbox_status = "PUBLISHED"
+            if r.status_code not in (200, 201):
+                self.log_test("Outbox Dual-Write Prevention", False,
+                               f"Incident creation FAILED with Kafka down: {r.status_code} {r.text} "
+                               f"-- this means the write path has an undisclosed Kafka dependency")
+                return
+
+            incident_id = r.json()["id"]
+            print(f"    Incident {incident_id} created successfully with Kafka down (DB write independent of Kafka)")
+
+        finally:
+            print(f"    Restarting {KAFKA_CONTAINER}...")
+            self._docker(["start", KAFKA_CONTAINER])
+
+        if incident_id is None:
+            return
+
+        # Poll audit-service until the backlogged outbox event actually
+        # arrives -- proving the publisher's retry loop recovered on its
+        # own, not asserting that it theoretically would.
+        deadline = time.time() + 90
+        found = False
+        while time.time() < deadline:
+            try:
+                resp = requests.get(f"{AUDIT_SERVICE_URL}/api/v1/audit/events",
+                                     params={"size": 200, "sort": "occurredAt,desc"}, timeout=5)
+                if resp.status_code == 200:
+                    events = resp.json().get("content", [])
+                    if any(incident_id in json.dumps(e) for e in events):
+                        found = True
+                        break
+            except requests.RequestException:
+                pass
+            time.sleep(3)
 
         self.log_test(
-            "Transactional Outbox Dual-Write Prevention",
-            db_committed and outbox_status == "PUBLISHED",
-            f"Zero messages lost. Aggregate safely persisted in DB; outbox event recovered to PUBLISHED on broker reconnection."
+            "Outbox Dual-Write Prevention (real Kafka stop/start)",
+            found,
+            f"Incident {incident_id} persisted during the Kafka outage, and its outbox event "
+            f"{'was' if found else 'was NOT'} recovered by the publisher after Kafka came back "
+            f"(observed via audit-service's real audit trail)",
         )
+
+    def _register_and_login(self) -> str:
+        username = f"chaos_{uuid.uuid4().hex[:10]}"
+        r = requests.post(f"{GATEWAY_URL}/api/v1/auth/register", json={
+            "username": username,
+            "email": f"{username}@sentinelx.local",
+            "password": "ChaosTestPass123!",
+            "first_name": "Chaos",
+            "last_name": "Tester",
+        }, timeout=10)
+        r.raise_for_status()
+        return r.json()["access_token"]
+
+    @staticmethod
+    def _docker(args):
+        result = subprocess.run(["docker", *args], capture_output=True, text=True, timeout=60)
+        if result.returncode != 0:
+            raise RuntimeError(f"docker {' '.join(args)} failed: {result.stderr}")
+        # Give the container a moment to actually come back up/tear down
+        # before the next step depends on its state.
+        time.sleep(5)
 
     def run_all(self):
         print("================================================================")
         print("SentinelX Chaos & Distributed Resilience Engineering Suite")
+        print("(exercises the real running stack -- run `make dev` first)")
         print("================================================================\n")
         self.test_ai_service_outage_fallback()
-        self.test_duplicate_kafka_message_idempotency()
+        self.test_duplicate_request_idempotency()
         self.test_outbox_guarantee_under_broker_disconnect()
 
         total = len(self.results)
         passed = sum(1 for r in self.results if r["passed"])
         print(f"Test Summary: {passed}/{total} Scenarios Validated Resilient.")
         return 0 if passed == total else 1
+
 
 if __name__ == "__main__":
     suite = ResilienceTestSuite()

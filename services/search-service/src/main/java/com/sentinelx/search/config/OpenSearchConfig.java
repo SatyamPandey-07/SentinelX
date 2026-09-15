@@ -1,5 +1,8 @@
 package com.sentinelx.search.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.apache.hc.core5.http.HttpHost;
 import org.opensearch.client.json.jackson.JacksonJsonpMapper;
 import org.opensearch.client.opensearch.OpenSearchClient;
@@ -24,9 +27,20 @@ public class OpenSearchConfig {
             @Value("${opensearch.port:9200}") int port,
             @Value("${opensearch.scheme:http}") String scheme) {
 
+        // The client's default JacksonJsonpMapper() constructs its own plain
+        // ObjectMapper with no modules registered -- serializing
+        // IncidentDocument.createdAt (an Instant) then fails with
+        // InvalidDefinitionException ("Java 8 date/time type ... not
+        // supported by default"). Spring Boot's auto-configured ObjectMapper
+        // registers JavaTimeModule for exactly this reason; this client
+        // needs its own copy since it's constructed independently.
+        ObjectMapper objectMapper = new ObjectMapper()
+                .registerModule(new JavaTimeModule())
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+
         HttpHost httpHost = new HttpHost(scheme, host, port);
         OpenSearchTransport transport = ApacheHttpClient5TransportBuilder.builder(httpHost)
-                .setMapper(new JacksonJsonpMapper())
+                .setMapper(new JacksonJsonpMapper(objectMapper))
                 .build();
         return new OpenSearchClient(transport);
     }
