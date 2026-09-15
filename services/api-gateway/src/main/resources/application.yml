@@ -1,0 +1,101 @@
+server:
+  port: ${GATEWAY_PORT:8080}
+
+spring:
+  application:
+    name: api-gateway
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2000ms
+  cloud:
+    gateway:
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOriginPatterns: "*"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+      routes:
+        # Auth Service Route
+        - id: auth-service-route
+          uri: ${AUTH_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/v1/auth/**
+
+        # Incident Service Route
+        - id: incident-service-route
+          uri: ${INCIDENT_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/v1/incidents/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: incidentCircuitBreaker
+                fallbackUri: forward:/fallback/incidents
+
+        # Location Service Route
+        - id: location-service-route
+          uri: ${LOCATION_SERVICE_URL:http://localhost:8084}
+          predicates:
+            - Path=/api/v1/location/**
+
+        # Search Service Route
+        - id: search-service-route
+          uri: ${SEARCH_SERVICE_URL:http://localhost:8086}
+          predicates:
+            - Path=/api/v1/search/**
+
+        # Analytics Service Route
+        - id: analytics-service-route
+          uri: ${ANALYTICS_SERVICE_URL:http://localhost:8089}
+          predicates:
+            - Path=/api/v1/analytics/**
+
+        # Audit Service Route
+        - id: audit-service-route
+          uri: ${AUDIT_SERVICE_URL:http://localhost:8090}
+          predicates:
+            - Path=/api/v1/audit/**
+
+        # AI & RAG Service Route
+        - id: ai-service-route
+          uri: ${AI_SERVICE_URL:http://localhost:8000}
+          predicates:
+            - Path=/api/v1/ai/**
+
+        # Realtime WebSocket STOMP Route
+        - id: realtime-service-route
+          uri: ${REALTIME_SERVICE_URL:http://localhost:8087}
+          predicates:
+            - Path=/ws/**
+
+jwt:
+  secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      incidentCircuitBreaker:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 5000
+        permittedNumberOfCallsInHalfOpenState: 3
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always

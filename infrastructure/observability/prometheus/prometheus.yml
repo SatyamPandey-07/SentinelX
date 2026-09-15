@@ -1,0 +1,64 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'sentinelx-gateway'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['api-gateway:8080']
+
+  - job_name: 'sentinelx-auth'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['auth-service:8081']
+
+  - job_name: 'sentinelx-incident'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['incident-service:8082']
+
+  - job_name: 'sentinelx-assignment'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['assignment-service:8083']
+
+  - job_name: 'sentinelx-location'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['location-service:8084']
+
+  - job_name: 'sentinelx-sla'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['sla-service:8085']
+
+  - job_name: 'sentinelx-search'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['search-service:8086']
+
+  - job_name: 'sentinelx-realtime'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['realtime-service:8087']
+
+  - job_name: 'sentinelx-notification'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['notification-service:8088']
+
+  - job_name: 'sentinelx-analytics'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['analytics-service:8089']
+
+  - job_name: 'sentinelx-audit'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['audit-service:8090']
+
+  - job_name: 'sentinelx-ai'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['ai-service:8000']

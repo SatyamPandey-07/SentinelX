@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package com.sentinelx.proto.location;
+
+option java_multiple_files = true;
+option java_package = "com.sentinelx.proto.location";
+option java_outer_classname = "LocationServiceProto";
+
+service LocationService {
+  rpc GetDistance (DistanceRequest) returns (DistanceResponse);
+  rpc FindNearestResponders (NearestRespondersRequest) returns (NearestRespondersResponse);
+  rpc CheckZone (ZoneCheckRequest) returns (ZoneCheckResponse);
+}
+
+message GeoPoint {
+  double latitude = 1;
+  double longitude = 2;
+}
+
+message DistanceRequest {
+  GeoPoint origin = 1;
+  GeoPoint destination = 2;
+}
+
+message DistanceResponse {
+  double distance_meters = 1;
+  double estimated_travel_seconds = 2;
+}
+
+message NearestRespondersRequest {
+  GeoPoint incident_location = 1;
+  int32 max_results = 2;
+  double max_radius_meters = 3;
+  repeated string required_skills = 4;
+}
+
+message ResponderLocationInfo {
+  string responder_id = 1;
+  string responder_name = 2;
+  GeoPoint current_location = 3;
+  double distance_meters = 4;
+  repeated string skills = 5;
+  int32 active_incident_count = 6;
+}
+
+message NearestRespondersResponse {
+  repeated ResponderLocationInfo responders = 1;
+}
+
+message ZoneCheckRequest {
+  GeoPoint location = 1;
+}
+
+message ZoneCheckResponse {
+  string zone_id = 1;
+  string zone_name = 2;
+  bool is_restricted = 3;
+}

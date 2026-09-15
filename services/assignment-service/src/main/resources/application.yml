@@ -1,0 +1,45 @@
+server:
+  port: ${ASSIGNMENT_SERVICE_PORT:8083}
+
+grpc:
+  client:
+    location-service:
+      host: ${LOCATION_GRPC_HOST:localhost}
+      port: ${LOCATION_GRPC_PORT:9094}
+
+spring:
+  application:
+    name: assignment-service
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 2000ms
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+    consumer:
+      group-id: assignment-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+assignment:
+  weights:
+    distance: 0.45
+    skill: 0.35
+    workload: 0.20
+  lock-ttl-seconds: 10
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always

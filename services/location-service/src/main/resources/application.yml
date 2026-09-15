@@ -1,0 +1,35 @@
+server:
+  port: ${LOCATION_SERVICE_PORT:8084}
+
+grpc:
+  server:
+    port: ${LOCATION_GRPC_PORT:9094}
+
+spring:
+  application:
+    name: location-service
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${LOCATION_DB_NAME:sentinelx_location}
+    username: ${POSTGRES_USER:sentinelx_admin}
+    password: ${POSTGRES_PASSWORD:sentinelx_secret_password}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    show-sql: false
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
