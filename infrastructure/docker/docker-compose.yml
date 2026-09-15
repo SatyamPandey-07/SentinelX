@@ -249,6 +249,292 @@ services:
     networks:
       - sentinelx-net
 
+  # ==========================================================================
+  # APPLICATION SERVICES (Section 47: `docker compose up` starts the whole
+  # system, not just infra). Each builds from its own Dockerfile with the
+  # repo root as build context (multi-module Maven reactor — see the
+  # Dockerfiles themselves for why).
+  # ==========================================================================
+
+  auth-service:
+    build:
+      context: ../..
+      dockerfile: services/auth-service/Dockerfile
+    container_name: sentinelx-auth-service
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: sentinelx_admin
+      POSTGRES_PASSWORD: sentinelx_secret_password
+      AUTH_DB_NAME: sentinelx_auth
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - sentinelx-net
+
+  incident-service:
+    build:
+      context: ../..
+      dockerfile: services/incident-service/Dockerfile
+    container_name: sentinelx-incident-service
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: sentinelx_admin
+      POSTGRES_PASSWORD: sentinelx_secret_password
+      INCIDENT_DB_NAME: sentinelx_incident
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+    ports:
+      - "8082:8082"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - sentinelx-net
+
+  location-service:
+    build:
+      context: ../..
+      dockerfile: services/location-service/Dockerfile
+    container_name: sentinelx-location-service
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: sentinelx_admin
+      POSTGRES_PASSWORD: sentinelx_secret_password
+      LOCATION_DB_NAME: sentinelx_location
+      LOCATION_GRPC_PORT: 9094
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+    ports:
+      - "8084:8084"
+      - "9094:9094"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - sentinelx-net
+
+  assignment-service:
+    build:
+      context: ../..
+      dockerfile: services/assignment-service/Dockerfile
+    container_name: sentinelx-assignment-service
+    restart: unless-stopped
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      LOCATION_GRPC_HOST: location-service
+      LOCATION_GRPC_PORT: 9094
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+    ports:
+      - "8083:8083"
+    depends_on:
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      location-service:
+        condition: service_started
+    networks:
+      - sentinelx-net
+
+  sla-service:
+    build:
+      context: ../..
+      dockerfile: services/sla-service/Dockerfile
+    container_name: sentinelx-sla-service
+    restart: unless-stopped
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+    ports:
+      - "8085:8085"
+    depends_on:
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - sentinelx-net
+
+  search-service:
+    build:
+      context: ../..
+      dockerfile: services/search-service/Dockerfile
+    container_name: sentinelx-search-service
+    restart: unless-stopped
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      OPENSEARCH_HOST: opensearch
+      OPENSEARCH_PORT: 9200
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+    ports:
+      - "8086:8086"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+    networks:
+      - sentinelx-net
+
+  realtime-service:
+    build:
+      context: ../..
+      dockerfile: services/realtime-service/Dockerfile
+    container_name: sentinelx-realtime-service
+    restart: unless-stopped
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+    ports:
+      - "8087:8087"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - sentinelx-net
+
+  notification-service:
+    build:
+      context: ../..
+      dockerfile: services/notification-service/Dockerfile
+    container_name: sentinelx-notification-service
+    restart: unless-stopped
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      MAIL_HOST: mailhog
+      MAIL_PORT: 1025
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+    ports:
+      - "8088:8088"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - sentinelx-net
+
+  analytics-service:
+    build:
+      context: ../..
+      dockerfile: services/analytics-service/Dockerfile
+    container_name: sentinelx-analytics-service
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: sentinelx_admin
+      POSTGRES_PASSWORD: sentinelx_secret_password
+      ANALYTICS_DB_NAME: sentinelx_analytics
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+    ports:
+      - "8089:8089"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - sentinelx-net
+
+  audit-service:
+    build:
+      context: ../..
+      dockerfile: services/audit-service/Dockerfile
+    container_name: sentinelx-audit-service
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: sentinelx_admin
+      POSTGRES_PASSWORD: sentinelx_secret_password
+      AUDIT_DB_NAME: sentinelx_audit
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+    ports:
+      - "8090:8090"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - sentinelx-net
+
+  ai-service:
+    build:
+      context: ../../services/ai-service
+      dockerfile: Dockerfile
+    container_name: sentinelx-ai-service
+    restart: unless-stopped
+    environment:
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: 6333
+      AI_CLASSIFIER_PROVIDER: ${AI_CLASSIFIER_PROVIDER:-auto}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+    ports:
+      - "8000:8000"
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    networks:
+      - sentinelx-net
+
+  api-gateway:
+    build:
+      context: ../..
+      dockerfile: services/api-gateway/Dockerfile
+    container_name: sentinelx-api-gateway
+    restart: unless-stopped
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+      AUTH_SERVICE_URL: http://auth-service:8081
+      INCIDENT_SERVICE_URL: http://incident-service:8082
+      LOCATION_SERVICE_URL: http://location-service:8084
+      SEARCH_SERVICE_URL: http://search-service:8086
+      ANALYTICS_SERVICE_URL: http://analytics-service:8089
+      AUDIT_SERVICE_URL: http://audit-service:8090
+      AI_SERVICE_URL: http://ai-service:8000
+      REALTIME_SERVICE_URL: http://realtime-service:8087
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+    ports:
+      - "8080:8080"
+    depends_on:
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      incident-service:
+        condition: service_started
+    networks:
+      - sentinelx-net
+
 networks:
   sentinelx-net:
     driver: bridge
