@@ -52,6 +52,17 @@ outbox:
     batch-size: 50
     max-retries: 5
 
+# Section 1 items 4-6: AI classification and duplicate detection run
+# synchronously during incident creation, with strict timeouts — both are
+# allowed to fail without ever blocking emergency reporting (Section 23).
+ai-service:
+  url: ${AI_SERVICE_URL:http://localhost:8000}
+  timeout-ms: 2000
+
+search-service:
+  url: ${SEARCH_SERVICE_URL:http://localhost:8086}
+  timeout-ms: 1000
+
 management:
   endpoints:
     web:

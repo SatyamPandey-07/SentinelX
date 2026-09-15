@@ -69,6 +69,7 @@ public class ScoringEngine {
         if (category == null) return "GENERAL_FIRST_AID";
         return switch (category) {
             case FIRE -> "FIRE";
+            case HAZMAT -> "HAZMAT";
             case MEDICAL -> "MEDICAL";
             case SECURITY, SUSPICIOUS_ACTIVITY, HARASSMENT, THEFT -> "SECURITY";
             case INFRASTRUCTURE, ELECTRICAL, EQUIPMENT_FAILURE -> "STRUCTURAL";

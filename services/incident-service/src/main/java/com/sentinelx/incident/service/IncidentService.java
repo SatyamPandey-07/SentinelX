@@ -9,6 +9,8 @@ import com.sentinelx.common.enums.IncidentCategory;
 import com.sentinelx.common.enums.IncidentSeverity;
 import com.sentinelx.common.enums.IncidentStatus;
 import com.sentinelx.common.events.*;
+import com.sentinelx.incident.client.AiClassificationClient;
+import com.sentinelx.incident.client.DuplicateCheckClient;
 import com.sentinelx.incident.entity.IncidentEntity;
 import com.sentinelx.incident.entity.IncidentLocationEntity;
 import com.sentinelx.incident.outbox.OutboxEventEntity;
@@ -39,16 +41,22 @@ public class IncidentService {
     private final OutboxEventRepository outboxEventRepository;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+    private final AiClassificationClient aiClassificationClient;
+    private final DuplicateCheckClient duplicateCheckClient;
 
     public IncidentService(
             IncidentRepository incidentRepository,
             OutboxEventRepository outboxEventRepository,
             StringRedisTemplate redisTemplate,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            AiClassificationClient aiClassificationClient,
+            DuplicateCheckClient duplicateCheckClient) {
         this.incidentRepository = incidentRepository;
         this.outboxEventRepository = outboxEventRepository;
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
+        this.aiClassificationClient = aiClassificationClient;
+        this.duplicateCheckClient = duplicateCheckClient;
     }
 
     @Transactional
@@ -66,16 +74,43 @@ public class IncidentService {
             }
         }
 
-        // 1. Create Incident Aggregate
+        // 1. AI Classification (Section 1 items 4-5). Reporter-supplied
+        // category/severity are the fallback, used verbatim if AI is
+        // unavailable or its opinion doesn't map to a valid enum — see
+        // AiClassificationClient for the full failure-handling contract.
+        IncidentCategory finalCategory = request.category();
+        IncidentSeverity finalSeverity = request.severity() != null ? request.severity() : IncidentSeverity.MEDIUM;
+
+        var classification = aiClassificationClient.classify(request.title(), request.description(), request.category());
+        if (classification.isPresent()) {
+            finalCategory = classification.get().category();
+            finalSeverity = classification.get().severity();
+            log.info("AI classified incident as category={} severity={} confidence={} safetyRuleApplied={}",
+                    finalCategory, finalSeverity, classification.get().confidence(), classification.get().safetyRuleApplied());
+        }
+
+        // 2. Duplicate Detection (Section 1 item 6, Section 10). Logged
+        // only — never blocks creation, see DuplicateCheckClient javadoc.
+        if (request.location() != null) {
+            duplicateCheckClient.checkDuplicate(
+                    request.title(), request.description(), finalCategory,
+                    request.location().latitude(), request.location().longitude()
+            ).ifPresent(dup -> log.warn(
+                    "Potential duplicate of incident {} detected (similarity={}, distance={}m) — creating anyway; "
+                            + "emergency reporting is never blocked on a duplicate-detection signal",
+                    dup.originalIncidentId(), dup.similarityScore(), dup.distanceMeters()));
+        }
+
+        // 3. Create Incident Aggregate
         IncidentEntity incident = new IncidentEntity(
                 reporterId,
                 request.title(),
                 request.description(),
-                request.category(),
-                request.severity()
+                finalCategory,
+                finalSeverity
         );
 
-        // 2. Set Geospatial Location
+        // 4. Set Geospatial Location
         if (request.location() != null) {
             IncidentLocationEntity loc = new IncidentLocationEntity(
                     incident,
@@ -89,20 +124,20 @@ public class IncidentService {
             incident.setLocation(loc);
         }
 
-        // 3. Attachments
+        // 5. Attachments
         if (request.attachmentUrls() != null) {
             for (String url : request.attachmentUrls()) {
                 incident.addAttachment(url);
             }
         }
 
-        // 4. Initial Status History Record
+        // 6. Initial Status History Record
         incident.addStatusTransition(IncidentStatus.REPORTED, reporterId, "Initial emergency report created");
 
-        // 5. Atomic INSERT into Incidents Table
+        // 7. Atomic INSERT into Incidents Table
         IncidentEntity saved = incidentRepository.save(incident);
 
-        // 6. Transactional Outbox Event (Both commit atomically in same DB transaction)
+        // 8. Transactional Outbox Event (Both commit atomically in same DB transaction)
         IncidentCreatedPayload payload = new IncidentCreatedPayload(
                 saved.getId(),
                 saved.getReporterId(),

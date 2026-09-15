@@ -7,6 +7,8 @@ import com.sentinelx.common.dto.IncidentResponse;
 import com.sentinelx.common.enums.IncidentCategory;
 import com.sentinelx.common.enums.IncidentSeverity;
 import com.sentinelx.common.enums.IncidentStatus;
+import com.sentinelx.incident.client.AiClassificationClient;
+import com.sentinelx.incident.client.DuplicateCheckClient;
 import com.sentinelx.incident.entity.IncidentEntity;
 import com.sentinelx.incident.outbox.OutboxEventEntity;
 import com.sentinelx.incident.outbox.OutboxEventRepository;
@@ -43,6 +45,12 @@ class IncidentServiceTest {
     @Mock
     private ValueOperations<String, String> valueOperations;
 
+    @Mock
+    private AiClassificationClient aiClassificationClient;
+
+    @Mock
+    private DuplicateCheckClient duplicateCheckClient;
+
     private ObjectMapper objectMapper;
     private IncidentService incidentService;
 
@@ -51,7 +59,13 @@ class IncidentServiceTest {
         objectMapper = new ObjectMapper();
         objectMapper.findAndRegisterModules();
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        incidentService = new IncidentService(incidentRepository, outboxEventRepository, redisTemplate, objectMapper);
+        // Unstubbed: both clients default to Optional.empty() (Mockito's
+        // built-in Optional-aware default answer), exercising the same
+        // "AI/search unavailable" fallback path production traffic hits
+        // when either downstream call fails — see AiClassificationClient /
+        // DuplicateCheckClient javadoc for why that's the safe default.
+        incidentService = new IncidentService(incidentRepository, outboxEventRepository, redisTemplate, objectMapper,
+                aiClassificationClient, duplicateCheckClient);
     }
 
     @Test
