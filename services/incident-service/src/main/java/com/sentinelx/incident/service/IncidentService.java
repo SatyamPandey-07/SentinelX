@@ -169,7 +169,7 @@ public class IncidentService {
 
         IncidentResponse response = mapToResponse(saved);
 
-        // 7. Store in Idempotency Cache (24h TTL)
+        // 9. Store in Idempotency Cache (24h TTL)
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
             try {
                 String responseJson = objectMapper.writeValueAsString(response);
