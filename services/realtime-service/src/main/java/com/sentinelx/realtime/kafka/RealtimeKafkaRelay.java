@@ -17,15 +17,21 @@ public class RealtimeKafkaRelay {
         this.messagingTemplate = messagingTemplate;
     }
 
+    // groupId is unique per pod instance (${random.uuid}, resolved once at
+    // startup), NOT shared like every other consumer in this codebase.
+    // Every replica holds its own set of live WebSocket connections and
+    // must relay every event to them; a shared group id would let Kafka
+    // load-balance partitions across replicas, so only one pod's clients
+    // would see any given event once this scales past 1 replica.
     @KafkaListener(topics = {"incident.created", "incident.assigned", "incident.acknowledged", "incident.resolved"},
-                   groupId = "realtime-service-group")
+                   groupId = "realtime-service-group-${random.uuid}")
     public void onIncidentLifecycleEvent(String message) {
         log.info("Broadcasting incident lifecycle update to /topic/incidents: {}", message);
         messagingTemplate.convertAndSend("/topic/incidents", message);
     }
 
     @KafkaListener(topics = {"incident.sla.warning", "incident.sla.breached"},
-                   groupId = "realtime-service-sla-group")
+                   groupId = "realtime-service-sla-group-${random.uuid}")
     public void onSlaEvent(String message) {
         log.warn("Broadcasting SLA alert update to /topic/sla: {}", message);
         messagingTemplate.convertAndSend("/topic/sla", message);

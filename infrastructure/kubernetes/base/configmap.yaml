@@ -5,13 +5,48 @@ metadata:
 data:
   ENVIRONMENT: "production"
   LOG_LEVEL: "INFO"
-  POSTGRES_HOST: "postgres.sentinelx-prod.svc.cluster.local"
+
+  # Shared infrastructure — each value is a K8s Service DNS name in-cluster
+  # (same names as the Service objects below), not a hostname the app has
+  # to be told about differently per environment.
+  POSTGRES_HOST: "postgres"
   POSTGRES_PORT: "5432"
-  REDIS_HOST: "redis.sentinelx-prod.svc.cluster.local"
+  POSTGRES_USER: "sentinelx_admin"
+  REDIS_HOST: "redis"
   REDIS_PORT: "6379"
-  KAFKA_BOOTSTRAP_SERVERS: "kafka.sentinelx-prod.svc.cluster.local:9092"
-  OPENSEARCH_HOST: "opensearch.sentinelx-prod.svc.cluster.local"
+  KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+  OPENSEARCH_HOST: "opensearch"
   OPENSEARCH_PORT: "9200"
-  QDRANT_HOST: "qdrant.sentinelx-prod.svc.cluster.local"
+  QDRANT_HOST: "qdrant"
   QDRANT_PORT: "6333"
-  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.sentinelx-prod.svc.cluster.local:4317"
+  MAIL_HOST: "mailhog"
+  MAIL_PORT: "1025"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+
+  # Per-service database names — each service owns its own database on the
+  # shared PostgreSQL instance (Section 2: "avoid shared databases between
+  # microservices" means no shared *schema/tables*, not a separate DB
+  # server per service, which would be overkill for this scale).
+  AUTH_DB_NAME: "sentinelx_auth"
+  INCIDENT_DB_NAME: "sentinelx_incident"
+  LOCATION_DB_NAME: "sentinelx_location"
+  AUDIT_DB_NAME: "sentinelx_audit"
+  ANALYTICS_DB_NAME: "sentinelx_analytics"
+
+  # gRPC: assignment-service -> location-service (Section 18)
+  LOCATION_GRPC_HOST: "location-service"
+  LOCATION_GRPC_PORT: "9094"
+
+  # API Gateway routing targets (Section 3) — in-cluster Service DNS names
+  AUTH_SERVICE_URL: "http://auth-service:8081"
+  INCIDENT_SERVICE_URL: "http://incident-service:8082"
+  LOCATION_SERVICE_URL: "http://location-service:8084"
+  SEARCH_SERVICE_URL: "http://search-service:8086"
+  ANALYTICS_SERVICE_URL: "http://analytics-service:8089"
+  AUDIT_SERVICE_URL: "http://audit-service:8090"
+  AI_SERVICE_URL: "http://ai-service:8000"
+  REALTIME_SERVICE_URL: "http://realtime-service:8087"
+
+  # AI service provider selection (Section 12) — keys themselves are in
+  # sentinelx-secrets, never here
+  AI_CLASSIFIER_PROVIDER: "auto"

@@ -7,7 +7,10 @@ spring:
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:
-      group-id: realtime-service-group
+      # No group-id here — both @KafkaListener annotations in
+      # RealtimeKafkaRelay set their own unique-per-pod groupId
+      # (${random.uuid}), which takes precedence over this property. See
+      # the comment there for why a shared group id would be a bug.
       auto-offset-reset: latest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
