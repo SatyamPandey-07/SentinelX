@@ -517,6 +517,7 @@ services:
     build:
       context: ../..
       dockerfile: services/api-gateway/Dockerfile
+    image: sentinelx/api-gateway:latest
     container_name: sentinelx-api-gateway
     restart: unless-stopped
     environment:
