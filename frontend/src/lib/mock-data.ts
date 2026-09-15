@@ -240,3 +240,67 @@ export const MOCK_SERVICES_HEALTH = [
   { name: "OpenSearch Indexer", status: "HEALTHY", p95: "45ms", cpu: "34%", mem: "2.1GB", lag: "4ms" },
   { name: "WebSocket Relay", status: "HEALTHY", p95: "2ms", cpu: "11%", mem: "140MB", lag: "0ms" }
 ];
+
+export interface AuditLogEntry {
+  id: string;
+  block_index: number;
+  timestamp: string;
+  action: string;
+  entity_id: string;
+  actor: string;
+  prev_hash: string;
+  current_hash: string;
+  payload_summary: string;
+  verified: boolean;
+}
+
+export const MOCK_AUDIT_LOGS: AuditLogEntry[] = [
+  {
+    id: "LOG-00491",
+    block_index: 491,
+    timestamp: "14:24:18.412 UTC",
+    action: "DISPATCH_ACKNOWLEDGED",
+    entity_id: "INC-2026-00921",
+    actor: "RESPONDER_R104",
+    prev_hash: "8f7d9a1c2e4b6d8e0f2a4c6e8b0d2f4a6c8e0b2d4f6a8c0e2b4d6f8a0c2e4b6d",
+    current_hash: "a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0",
+    payload_summary: "Responder R-104 acknowledged dispatch with ETA 1.8m",
+    verified: true
+  },
+  {
+    id: "LOG-00490",
+    block_index: 490,
+    timestamp: "14:23:45.109 UTC",
+    action: "MUTEX_LOCK_ACQUIRED",
+    entity_id: "R-104",
+    actor: "ASSIGNMENT_SERVICE",
+    prev_hash: "4a6c8e0b2d4f6a8c0e2b4d6f8a0c2e4b6d8f7d9a1c2e4b6d8e0f2a4c6e8b0d2f",
+    current_hash: "8f7d9a1c2e4b6d8e0f2a4c6e8b0d2f4a6c8e0b2d4f6a8c0e2b4d6f8a0c2e4b6d",
+    payload_summary: "Redis SETNX lock acquired for responder R-104 ttl=300000ms",
+    verified: true
+  },
+  {
+    id: "LOG-00489",
+    block_index: 489,
+    timestamp: "14:23:42.880 UTC",
+    action: "AI_INFERENCE_LOGGED",
+    entity_id: "INC-2026-00921",
+    actor: "AI_SERVICE_VIGIL",
+    prev_hash: "1c2e4b6d8e0f2a4c6e8b0d2f4a6c8e0b2d4f6a8c0e2b4d6f8a0c2e4b6d8f7d9a",
+    current_hash: "4a6c8e0b2d4f6a8c0e2b4d6f8a0c2e4b6d8f7d9a1c2e4b6d8e0f2a4c6e8b0d2f",
+    payload_summary: "DeepSeek triage: CRITICAL_MEDICAL confidence=0.974",
+    verified: true
+  },
+  {
+    id: "LOG-00488",
+    block_index: 488,
+    timestamp: "14:23:40.015 UTC",
+    action: "INCIDENT_CREATED",
+    entity_id: "INC-2026-00921",
+    actor: "GATEWAY_INGRESS",
+    prev_hash: "0000000000000000000000000000000000000000000000000000000000000000",
+    current_hash: "1c2e4b6d8e0f2a4c6e8b0d2f4a6c8e0b2d4f6a8c0e2b4d6f8a0c2e4b6d8f7d9a",
+    payload_summary: "Incident ingested via PostGIS geofence trigger at Sector B",
+    verified: true
+  }
+];
