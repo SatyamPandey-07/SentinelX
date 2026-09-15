@@ -181,6 +181,25 @@ services:
       - sentinelx-net
 
   # ==========================================
+  # OpenTelemetry Collector (Section 21)
+  # Central ingestion point for traces from every service's OTel Java
+  # agent — decouples app instrumentation from the tracing backend (batches
+  # spans, could fan out to multiple backends later) rather than every
+  # service hardcoding Jaeger's address directly.
+  # ==========================================
+  otel-collector:
+    image: otel/opentelemetry-collector:0.102.1
+    container_name: sentinelx-otel-collector
+    restart: unless-stopped
+    command: ["--config=/etc/otel-collector-config.yml"]
+    volumes:
+      - ../observability/otel/otel-collector-config.yml:/etc/otel-collector-config.yml:ro
+    depends_on:
+      - jaeger
+    networks:
+      - sentinelx-net
+
+  # ==========================================
   # Metrics Scraper: Prometheus
   # ==========================================
   prometheus:

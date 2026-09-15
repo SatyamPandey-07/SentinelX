@@ -34,10 +34,32 @@ FROM eclipse-temurin:21-jre-alpine AS runtime
 RUN addgroup -S app && adduser -S -G app -u 1000 appuser
 WORKDIR /app
 COPY --from=builder /build/services/analytics-service/target/analytics-service-*.jar app.jar
+
+# OpenTelemetry Java auto-instrumentation agent (Section 21): attaches at
+# startup with zero code changes, auto-instrumenting Spring MVC/WebFlux,
+# JDBC, Kafka producers/consumers, Redis clients and gRPC — exports real
+# traces to the otel-collector -> Jaeger pipeline. Pinned to a real fetched
+# release (v2.31.1), never `latest`. Metrics/logs exporters are off: this
+# service already exports metrics via Micrometer/Prometheus (Actuator), and
+# wiring the OTel logs bridge is a separate change tracked alongside
+# structured JSON logging — exporting untested here would be a second,
+# unused metrics/logs pipeline for the sake of appearing complete.
+ADD https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v2.31.1/opentelemetry-javaagent.jar /app/otel-javaagent.jar
+RUN chmod 644 /app/otel-javaagent.jar && chown appuser:app /app/otel-javaagent.jar app.jar
+
 USER appuser
 
 EXPOSE 8089
 HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
     CMD wget -qO- http://localhost:8089/actuator/health | grep -q '"status":"UP"' || exit 1
 
-ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75.0", "-jar", "app.jar"]
+ENV OTEL_SERVICE_NAME=analytics-service \
+    OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317 \
+    OTEL_EXPORTER_OTLP_PROTOCOL=grpc \
+    OTEL_TRACES_EXPORTER=otlp \
+    OTEL_METRICS_EXPORTER=none \
+    OTEL_LOGS_EXPORTER=none \
+    OTEL_PROPAGATORS=tracecontext,baggage \
+    OTEL_JAVAAGENT_ENABLED=true
+
+ENTRYPOINT ["java", "-javaagent:/app/otel-javaagent.jar", "-XX:MaxRAMPercentage=75.0", "-jar", "app.jar"]
