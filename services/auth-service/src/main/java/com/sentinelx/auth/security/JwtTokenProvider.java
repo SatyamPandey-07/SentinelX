@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @Component
 public class JwtTokenProvider {
@@ -36,6 +37,7 @@ public class JwtTokenProvider {
         Date expiryDate = new Date(now.getTime() + accessTokenExpirationMs);
 
         return Jwts.builder()
+                .id(UUID.randomUUID().toString())
                 .subject(userId)
                 .claim("username", username)
                 .claim("role", role)
@@ -50,7 +52,14 @@ public class JwtTokenProvider {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + refreshTokenExpirationMs);
 
+        // A random jti (RFC 7519) is required, not just nice-to-have: iat/exp
+        // are second-granularity, so without it two refresh tokens issued
+        // for the same user within the same wall-clock second (e.g. login
+        // immediately after register) are byte-for-byte identical JWTs —
+        // same signature, same SHA-256 hash — and collide on
+        // refresh_tokens.token_hash's unique constraint.
         return Jwts.builder()
+                .id(UUID.randomUUID().toString())
                 .subject(userId)
                 .claim("type", "REFRESH")
                 .issuedAt(now)
