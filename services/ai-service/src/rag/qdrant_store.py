@@ -1,63 +1,99 @@
 import os
-import math
-import zlib
-import re
+import logging
 from typing import List, Dict, Tuple
+
+import numpy as np
+from fastembed import TextEmbedding
+from qdrant_client import QdrantClient
+from qdrant_client.models import Distance, VectorParams, PointStruct
+
 from src.rag.knowledge_base import CAMPUS_EMERGENCY_POLICIES
 
-STOP_WORDS = {
-    "what", "should", "i", "do", "if", "a", "an", "the", "in", "on", "at",
-    "to", "for", "of", "and", "or", "is", "are", "goes", "off", "when",
-    "with", "from", "by", "as", "be", "this", "that"
-}
+logger = logging.getLogger(__name__)
+
+# BAAI/bge-small-en-v1.5: a real dense-embedding model (384-dim), run locally
+# via fastembed's ONNX runtime. No API key required, no torch dependency —
+# a good fit for a portfolio-scale service, unlike calling a paid embeddings
+# API that would need yet another credential.
+EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"
+COLLECTION_NAME = "campus_emergency_policies"
+
 
 class QdrantVectorStore:
     """
-    Vector Database abstraction (Section 14).
-    Integrates with Qdrant REST API on port 6333 with resilient in-memory fallback.
+    Vector Database integration (Section 14): real Qdrant client for
+    storage/ANN search, real embeddings via fastembed (local ONNX model, not
+    the CRC32 hash trick this used to fake). PostgreSQL/OpenSearch remain the
+    transactional stores; this only ever backs semantic retrieval.
+
+    Resilience (Section 23): if Qdrant is unreachable — at startup or on a
+    later call — this falls back to brute-force cosine similarity over the
+    same embeddings held in memory, so RAG answers keep working (possibly
+    slower, never absent) until Qdrant recovers.
     """
 
     def __init__(self):
         self.host = os.getenv("QDRANT_HOST", "localhost")
         self.port = int(os.getenv("QDRANT_PORT", "6333"))
-        self.collection_name = "campus_emergency_policies"
-        self.dimension = 128
         self.docs = list(CAMPUS_EMERGENCY_POLICIES)
-        # Compute embeddings on composite of title, section and content
-        self.doc_vectors = [
-            self._compute_vector(f"{d['document_name']} {d['section']} {d['content']}")
-            for d in self.docs
+
+        self.embedder = TextEmbedding(model_name=EMBEDDING_MODEL)
+        self.doc_vectors: List[np.ndarray] = list(self.embedder.embed(
+            [f"{d['document_name']} {d['section']} {d['content']}" for d in self.docs]
+        ))
+        self.dimension = len(self.doc_vectors[0])
+
+        self.client: QdrantClient | None = None
+        try:
+            self.client = QdrantClient(host=self.host, port=self.port, timeout=3)
+            self._ensure_collection()
+            self._upsert_documents()
+        except Exception as e:
+            logger.warning(
+                "Qdrant unavailable at startup (%s); RAG will serve from in-memory "
+                "embeddings until Qdrant recovers.", e,
+            )
+            self.client = None
+
+    def _ensure_collection(self):
+        if not self.client.collection_exists(COLLECTION_NAME):
+            self.client.create_collection(
+                collection_name=COLLECTION_NAME,
+                vectors_config=VectorParams(size=self.dimension, distance=Distance.COSINE),
+            )
+            logger.info("Created Qdrant collection '%s' (dim=%d)", COLLECTION_NAME, self.dimension)
+
+    def _upsert_documents(self):
+        points = [
+            PointStruct(id=i, vector=vec.tolist(), payload=doc)
+            for i, (doc, vec) in enumerate(zip(self.docs, self.doc_vectors))
         ]
-
-    def _tokenize(self, text: str) -> List[str]:
-        words = re.findall(r"\b[a-zA-Z0-9_-]+\b", text.lower())
-        return [w for w in words if w not in STOP_WORDS and len(w) > 1]
-
-    def _compute_vector(self, text: str) -> List[float]:
-        """
-        Computes deterministic normalized frequency embedding vector for semantic matching.
-        Uses CRC32 hashing across fixed dimensions without relying on process-randomized hash().
-        """
-        tokens = self._tokenize(text)
-        vec = [0.0] * self.dimension
-        for token in tokens:
-            bucket = zlib.crc32(token.encode("utf-8")) % self.dimension
-            vec[bucket] += 1.0
-
-        norm = math.sqrt(sum(x * x for x in vec))
-        if norm > 0:
-            vec = [x / norm for x in vec]
-        return vec
-
-    def _cosine_similarity(self, v1: List[float], v2: List[float]) -> float:
-        return sum(a * b for a, b in zip(v1, v2))
+        self.client.upsert(collection_name=COLLECTION_NAME, points=points)
 
     def search_similar(self, query: str, top_k: int = 3) -> List[Tuple[Dict[str, str], float]]:
-        q_vec = self._compute_vector(query)
-        scored = []
-        for doc, v in zip(self.docs, self.doc_vectors):
-            sim = self._cosine_similarity(q_vec, v)
-            scored.append((doc, sim))
+        query_vector = list(self.embedder.embed([query]))[0]
 
+        if self.client is not None:
+            try:
+                return self._search_qdrant(query_vector, top_k)
+            except Exception as e:
+                logger.warning("Qdrant search failed, falling back to in-memory embeddings: %s", e)
+
+        return self._search_local(query_vector, top_k)
+
+    def _search_qdrant(self, query_vector: np.ndarray, top_k: int) -> List[Tuple[Dict[str, str], float]]:
+        response = self.client.query_points(
+            collection_name=COLLECTION_NAME,
+            query=query_vector.tolist(),
+            limit=top_k,
+        )
+        return [(point.payload, point.score) for point in response.points]
+
+    def _search_local(self, query_vector: np.ndarray, top_k: int) -> List[Tuple[Dict[str, str], float]]:
+        scored = []
+        for doc, vec in zip(self.docs, self.doc_vectors):
+            denom = (np.linalg.norm(query_vector) * np.linalg.norm(vec)) or 1e-9
+            sim = float(np.dot(query_vector, vec) / denom)
+            scored.append((doc, sim))
         scored.sort(key=lambda x: x[1], reverse=True)
         return scored[:top_k]
