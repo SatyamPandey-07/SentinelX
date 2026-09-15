@@ -3,34 +3,69 @@
 @tailwind utilities;
 
 :root {
-  --background: #090d16;
-  --foreground: #f8fafc;
+  --background: #060911;
+  --foreground: #f1f5f9;
+  --card-bg: rgba(15, 23, 42, 0.75);
+  --card-border: rgba(51, 65, 85, 0.6);
+  --card-hover-border: rgba(100, 116, 139, 0.8);
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", "Helvetica Neue", Arial, sans-serif;
   overflow-x: hidden;
+  background-image: 
+    radial-gradient(circle at 50% 0%, rgba(30, 41, 59, 0.35) 0%, transparent 60%),
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 100% 100%, 32px 32px, 32px 32px;
 }
 
-/* Custom Tactical Scrollbars */
+/* Custom Bento Tactical Scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #090d16;
+  background: #060911;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 3px;
+  background: #1e293b;
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: #334155;
+}
+
+/* Bento Card Base & Accents */
+@layer components {
+  .bento-card {
+    @apply relative overflow-hidden rounded-2xl border border-slate-800/80 bg-slate-900/60 p-5 backdrop-blur-md transition-all duration-300 hover:border-slate-700 hover:shadow-xl hover:shadow-slate-950/40;
+  }
+  
+  .bento-card-interactive {
+    @apply bento-card cursor-pointer hover:-translate-y-0.5 hover:bg-slate-900/80;
+  }
+
+  .bento-card-critical {
+    @apply border-red-950/70 bg-gradient-to-b from-red-950/20 to-slate-900/70 hover:border-red-800/80;
+  }
+
+  .bento-card-warning {
+    @apply border-amber-950/70 bg-gradient-to-b from-amber-950/20 to-slate-900/70 hover:border-amber-800/80;
+  }
+
+  .bento-card-info {
+    @apply border-cyan-950/70 bg-gradient-to-b from-cyan-950/20 to-slate-900/70 hover:border-cyan-800/80;
+  }
+
+  .bento-card-success {
+    @apply border-emerald-950/70 bg-gradient-to-b from-emerald-950/20 to-slate-900/70 hover:border-emerald-800/80;
+  }
 }
 
 /* Radar pulse animation for critical emergency status */
@@ -41,7 +76,7 @@ body {
   }
   70% {
     transform: scale(1);
-    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+    box-shadow: 0 0 0 12px rgba(239, 68, 68, 0);
   }
   100% {
     transform: scale(0.95);
@@ -51,4 +86,17 @@ body {
 
 .pulse-critical {
   animation: pulse-ring 2s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite;
+}
+
+@keyframes radar-sweep {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-radar-sweep {
+  animation: radar-sweep 4s linear infinite;
 }
