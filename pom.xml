@@ -165,6 +165,18 @@
                         <source>${java.version}</source>
                         <target>${java.version}</target>
                         <release>${java.version}</release>
+                        <!--
+                            Without -parameters, a bare `@PathVariable String id` (no
+                            explicit name) fails at request time with "Name for argument
+                            of type [String] not specified, and parameter name
+                            information not available via reflection" — javac only
+                            retains parameter names in the class file with this flag.
+                            IDEs typically pass -parameters by default, which is exactly
+                            why this was invisible until a real request hit a service
+                            built from the actual Maven build (e.g. incident-service's
+                            GET /{id}, acknowledge, and resolve endpoints were broken).
+                        -->
+                        <parameters>true</parameters>
                     </configuration>
                 </plugin>
                 <plugin>
