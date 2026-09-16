@@ -143,35 +143,38 @@ export default function LandingPage() {
               <Shield className="w-4 h-4 text-cyan-400" />
             </div>
             <div>
-              <span className="text-base font-black tracking-widest text-white font-mono uppercase">VIGIL</span>
+              <span className="text-base font-black tracking-widest text-white font-mono uppercase">SENTINELX</span>
               <span className="text-[10px] text-cyan-400/90 font-mono ml-2.5 px-2 py-0.5 rounded bg-cyan-950/40 border border-cyan-500/30">
-                GUARDNET 3D
+                CAMPUS DEFENSE
               </span>
             </div>
           </Link>
         </div>
 
         <nav className="hidden lg:flex items-center gap-7 text-xs font-mono text-slate-400">
+          <Link href="/user" className="hover:text-cyan-400 transition-colors text-cyan-400 font-semibold">USER PORTAL</Link>
+          <Link href="/dashboard" className="hover:text-red-400 transition-colors text-red-400 font-semibold">ADMIN COMMAND</Link>
           <a href="#visualizer-3d" className="hover:text-cyan-400 transition-colors">3D DEFENSE GRID</a>
           <a href="#pipeline" className="hover:text-cyan-400 transition-colors">EVENT PIPELINE</a>
-          <a href="#features" className="hover:text-cyan-400 transition-colors">ARCHITECTURE</a>
-          <Link href="/dashboard" className="hover:text-white transition-colors">COMMAND CENTER</Link>
           <Link href="/map" className="hover:text-white transition-colors">RADAR MAP</Link>
-          <Link href="/sla" className="hover:text-white transition-colors">SLA MONITOR</Link>
           <Link href="/system-health" className="hover:text-white transition-colors">SYSTEM HEALTH</Link>
         </nav>
 
-        <div className="flex items-center gap-3">
-          <div className="hidden sm:flex items-center gap-2 text-[11px] font-mono text-emerald-400 bg-emerald-950/30 border border-emerald-500/30 px-3 py-1 rounded-md">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span>SYSTEM ONLINE</span>
-          </div>
+        <div className="flex items-center gap-2.5">
+          <Link
+            href="/login?mode=signin"
+            id="nav-signin"
+            className="px-3.5 py-1.5 rounded-lg bg-slate-900/80 hover:bg-slate-800 text-slate-300 text-xs font-mono font-bold transition-all border border-slate-700"
+          >
+            SIGN IN
+          </Link>
 
           <Link
-            href="/dashboard"
-            className="px-4 py-2 rounded-lg bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white text-xs font-bold font-mono tracking-wider transition-all shadow-lg shadow-red-600/30 flex items-center gap-1.5 border border-red-500/40"
+            href="/login?mode=signup"
+            id="nav-signup"
+            className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 text-white text-xs font-bold font-mono tracking-wider transition-all shadow-lg shadow-cyan-600/25 flex items-center gap-1.5 border border-cyan-400/30"
           >
-            <span>ENTER COMMAND</span>
+            <span>SIGN UP</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
@@ -209,14 +212,25 @@ export default function LandingPage() {
           </p>
         </div>
 
-        {/* CTAs */}
+        {/* CTAs with User Mode and Admin Mode routes */}
         <div ref={ctaRef} className="flex flex-wrap items-center justify-center gap-4 mb-10">
           <Link
-            href="/dashboard"
-            className="px-6 py-3.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-mono font-bold text-xs tracking-wider transition-all shadow-xl shadow-cyan-500/25 flex items-center gap-2"
+            href="/login?mode=signup&role=user"
+            id="hero-signup-user"
+            className="px-6 py-3.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-mono font-bold text-xs tracking-wider transition-all shadow-xl shadow-cyan-600/30 flex items-center gap-2 border border-cyan-400/40"
           >
             <Shield className="w-4 h-4" />
-            <span>LAUNCH COMMAND CENTER</span>
+            <span>SIGN UP (USER MODE - REPORT SOS)</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+
+          <Link
+            href="/login?mode=signin&role=admin"
+            id="hero-signin-admin"
+            className="px-6 py-3.5 rounded-xl bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 text-white font-mono font-bold text-xs tracking-wider transition-all shadow-xl shadow-red-600/30 flex items-center gap-2 border border-red-500/40"
+          >
+            <ShieldAlert className="w-4 h-4" />
+            <span>DISPATCH COMMAND (ADMIN MODE)</span>
             <ArrowRight className="w-4 h-4" />
           </Link>
 
