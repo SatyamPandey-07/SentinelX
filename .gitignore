@@ -70,3 +70,8 @@ ehthumbs.db
 *.log
 docker-volumes/
 infrastructure/docker/data/
+
+# Go build output
+tools/healthcheck/healthcheck
+tools/healthcheck/healthcheck.exe
+tools/healthcheck/*.exe
