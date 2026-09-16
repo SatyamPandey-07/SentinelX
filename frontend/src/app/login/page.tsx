@@ -73,6 +73,15 @@ function LoginContent() {
   };
 
   const handleRouteAfterAuth = (session: AuthSession) => {
+    // If we got here via a PlatformLink-style deep link (e.g. from the
+    // landing page's Platform section), honor it instead of the generic
+    // dashboard/user default -- only ever a same-origin relative path, to
+    // rule out an open redirect via a crafted `redirect` query value.
+    const redirect = searchParams.get('redirect');
+    if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) {
+      router.push(redirect);
+      return;
+    }
     if (session.role === 'ROLE_ADMIN' || isSuperAdmin(session.email, session.username)) {
       router.push('/dashboard');
     } else {

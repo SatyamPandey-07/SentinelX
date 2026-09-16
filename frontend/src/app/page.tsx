@@ -17,9 +17,15 @@ import {
   Terminal,
   Database,
   ChevronDown,
+  Radio,
+  ScrollText,
+  Activity,
+  Server,
+  LogIn,
 } from 'lucide-react';
 import { LandingScene3D } from '@/components/LandingScene3D';
 import { SafeSignedIn as SignedIn, SafeSignedOut as SignedOut, SafeUserButton as UserButton } from '@/components/ClerkGate';
+import { getSession } from '@/lib/auth';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
@@ -37,10 +43,43 @@ function Reveal({ children, className, delay = 0 }: { children: React.ReactNode;
   );
 }
 
+// Every app page other than / and /login requires a session (see
+// AppShell's useRequireAuth) -- linking straight to them from this public
+// page silently bounces a signed-out visitor to /login with no
+// explanation, which looks exactly like a dead link. This routes
+// signed-out visitors to sign-in first (labeled honestly) and only deep-
+// links for real once a session actually exists.
+function PlatformLink({
+  href,
+  hasSession,
+  children,
+  className,
+}: {
+  href: string;
+  hasSession: boolean;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <Link href={hasSession ? href : `/login?mode=signin&redirect=${encodeURIComponent(href)}`} className={className}>
+      {children}
+    </Link>
+  );
+}
+
 export default function LandingPage() {
   const [activeStep, setActiveStep] = useState(0);
   const [scrolled, setScrolled] = useState(false);
+  const [hasSession, setHasSession] = useState(false);
   const heroRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setHasSession(getSession() !== null);
+    const onAuthChange = () => setHasSession(getSession() !== null);
+    window.addEventListener('sentinelx_auth_change', onAuthChange);
+    return () => window.removeEventListener('sentinelx_auth_change', onAuthChange);
+  }, []);
+
   const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] });
   const heroOpacity = useTransform(scrollYProgress, [0, 0.9], [1, 0]);
   const scrollHintOpacity = useTransform(scrollYProgress, [0, 0.2], [1, 0]);
@@ -112,8 +151,8 @@ export default function LandingPage() {
         <nav className="hidden md:flex items-center gap-9 text-xs text-slate-400 uppercase tracking-widest">
           <a href="#pipeline" className="hover:text-white transition-colors">Pipeline</a>
           <a href="#architecture" className="hover:text-white transition-colors">Architecture</a>
-          <Link href="/map" className="hover:text-white transition-colors">Radar Map</Link>
-          <Link href="/system-health" className="hover:text-white transition-colors">System Health</Link>
+          <a href="#platform" className="hover:text-white transition-colors">Platform</a>
+          <a href="#stack" className="hover:text-white transition-colors">Stack</a>
         </nav>
 
         <div className="flex items-center gap-2.5">
@@ -321,9 +360,9 @@ export default function LandingPage() {
               <p className="text-xs text-slate-400 leading-relaxed max-w-xl mb-4 font-light">
                 Every status transition and acknowledgement is written into an append-only ledger, chained via SHA-256 for tamper evidence.
               </p>
-              <Link href="/audit" className="text-red-400 hover:text-red-300 flex items-center gap-1 text-xs font-bold">
+              <PlatformLink href="/audit" hasSession={hasSession} className="text-red-400 hover:text-red-300 flex items-center gap-1 text-xs font-bold">
                 View audit logs <ChevronRight className="w-3.5 h-3.5" />
-              </Link>
+              </PlatformLink>
             </Reveal>
 
             <Reveal className="bento-card group" delay={0.15}>
@@ -334,11 +373,95 @@ export default function LandingPage() {
               <p className="text-xs text-slate-400 leading-relaxed font-light mb-4">
                 Deadlines tracked in a Redis sorted set and swept for breaches — no database polling loop.
               </p>
-              <Link href="/sla" className="text-amber-400 hover:text-amber-300 flex items-center gap-1 text-xs font-bold">
+              <PlatformLink href="/sla" hasSession={hasSession} className="text-amber-400 hover:text-amber-300 flex items-center gap-1 text-xs font-bold">
                 Monitor SLA <ChevronRight className="w-3.5 h-3.5" />
-              </Link>
+              </PlatformLink>
             </Reveal>
           </div>
+        </div>
+      </section>
+
+      {/* ================= PLATFORM (real deep links, honestly gated) ================= */}
+      <section id="platform" className="relative py-24 md:py-32 px-6 lg:px-12">
+        <div className="max-w-6xl mx-auto">
+          <Reveal className="text-center max-w-2xl mx-auto mb-14">
+            <div className="inline-flex items-center gap-2 text-xs text-cyan-400 uppercase tracking-widest mb-3">
+              <Radio className="w-3.5 h-3.5" />
+              Inside the platform
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
+              Every surface, backed by the real thing
+            </h2>
+            <p className="text-slate-400 text-sm mt-3 font-light">
+              {hasSession ? 'You’re signed in — these open for real.' : 'Sign in to open any of these — no demo mode, no mock data.'}
+            </p>
+          </Reveal>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[
+              { href: '/dashboard', icon: Radio, iconWrap: 'bg-cyan-500/10 border-cyan-500/30', iconColor: 'text-cyan-400', title: 'Dispatch Command', desc: 'Live incident queue, acknowledge/resolve actions, real-time SLA countdowns.' },
+              { href: '/map', icon: Compass, iconWrap: 'bg-emerald-500/10 border-emerald-500/30', iconColor: 'text-emerald-400', title: 'Radar Map', desc: 'PostGIS-backed responder and incident positions on a live campus map.' },
+              { href: '/incidents', icon: ShieldAlert, iconWrap: 'bg-red-500/10 border-red-500/30', iconColor: 'text-red-400', title: 'Incident Board', desc: 'Full incident lifecycle — report, triage, assign, resolve, all through the real API.' },
+              { href: '/intelligence', icon: Bot, iconWrap: 'bg-purple-500/10 border-purple-500/30', iconColor: 'text-purple-400', title: 'AI Intelligence', desc: 'Query the RAG-grounded assistant over real incident and protocol data.' },
+              { href: '/audit', icon: ScrollText, iconWrap: 'bg-amber-500/10 border-amber-500/30', iconColor: 'text-amber-400', title: 'Audit Ledger', desc: 'The hash-chained record of every state transition, in order, unforgeable.' },
+              { href: '/system-health', icon: Server, iconWrap: 'bg-blue-500/10 border-blue-500/30', iconColor: 'text-blue-400', title: 'System Health', desc: 'Live status of all 11 microservices, polled directly from each one.' },
+            ].map((item, i) => {
+              const Icon = item.icon;
+              return (
+                <Reveal key={item.href} delay={i * 0.05}>
+                  <PlatformLink
+                    href={item.href}
+                    hasSession={hasSession}
+                    className="bento-card group flex flex-col h-full"
+                  >
+                    <div className={`w-10 h-10 rounded-xl border flex items-center justify-center mb-4 ${item.iconWrap}`}>
+                      <Icon className={`w-5 h-5 ${item.iconColor}`} />
+                    </div>
+                    <h3 className="text-base font-bold text-white mb-1.5">{item.title}</h3>
+                    <p className="text-xs text-slate-400 leading-relaxed font-light flex-1">{item.desc}</p>
+                    <div className="pt-3 mt-3 border-t border-white/[0.06] flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 group-hover:text-white transition-colors">
+                      {hasSession ? <ArrowRight className="w-3.5 h-3.5" /> : <LogIn className="w-3.5 h-3.5" />}
+                      {hasSession ? 'Open' : 'Sign in to open'}
+                    </div>
+                  </PlatformLink>
+                </Reveal>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* ================= STACK ================= */}
+      <section id="stack" className="relative py-24 md:py-32 px-6 lg:px-12 border-t border-white/[0.08]">
+        <div className="max-w-6xl mx-auto">
+          <Reveal className="text-center max-w-2xl mx-auto mb-14">
+            <div className="inline-flex items-center gap-2 text-xs text-emerald-400 uppercase tracking-widest mb-3">
+              <Activity className="w-3.5 h-3.5" />
+              Built with
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
+              No shortcuts in the stack
+            </h2>
+            <p className="text-slate-400 text-sm mt-3 font-light">
+              Eleven Java/Python microservices behind one gateway, each with its own database where it matters.
+            </p>
+          </Reveal>
+
+          <Reveal>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 text-center">
+              {[
+                'Java 21', 'Spring Boot', 'Apache Kafka', 'Redis 7', 'PostgreSQL + PostGIS', 'OpenSearch',
+                'Python · FastAPI', 'Qdrant', 'Next.js 14', 'gRPC', 'OpenTelemetry', 'Docker Compose',
+              ].map((tech) => (
+                <div
+                  key={tech}
+                  className="px-3 py-4 rounded-xl bg-white/[0.03] border border-white/[0.07] text-xs text-slate-300 font-mono hover:border-cyan-500/30 hover:text-white transition-colors"
+                >
+                  {tech}
+                </div>
+              ))}
+            </div>
+          </Reveal>
         </div>
       </section>
 
@@ -353,11 +476,10 @@ export default function LandingPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-6">
-            <Link href="/dashboard" className="hover:text-cyan-400 transition-colors">Dashboard</Link>
-            <Link href="/map" className="hover:text-cyan-400 transition-colors">Radar Map</Link>
-            <Link href="/incidents" className="hover:text-cyan-400 transition-colors">Incidents</Link>
-            <Link href="/intelligence" className="hover:text-cyan-400 transition-colors">AI Intelligence</Link>
-            <Link href="/system-health" className="hover:text-cyan-400 transition-colors">System Health</Link>
+            <a href="#pipeline" className="hover:text-cyan-400 transition-colors">Pipeline</a>
+            <a href="#architecture" className="hover:text-cyan-400 transition-colors">Architecture</a>
+            <a href="#platform" className="hover:text-cyan-400 transition-colors">Platform</a>
+            <a href="#stack" className="hover:text-cyan-400 transition-colors">Stack</a>
           </div>
 
           <div className="text-slate-600">© 2026 SentinelX · Distributed Systems</div>
