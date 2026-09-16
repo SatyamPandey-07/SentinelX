@@ -1,14 +1,14 @@
 package com.sentinelx.assignment;
 
 import com.sentinelx.assignment.service.DistributedLockService;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 import java.util.List;
@@ -20,23 +20,53 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Real concurrency proof for the Redis distributed lock (Section 9/30):
- * a genuine Redis container via Testcontainers, with genuinely concurrent
- * threads racing for the exact same responder lock key. A mock (as the
- * existing AssignmentScoringAndLockTest uses) can only assert "given this
- * stubbed return value, the code branches correctly" -- it cannot prove
- * SETNX is actually atomic under real contention. This test can.
+ * genuinely concurrent threads racing for the exact same responder lock key
+ * against a real Redis instance. A mock (as the existing
+ * AssignmentScoringAndLockTest uses) can only assert "given this stubbed
+ * return value, the code branches correctly" -- it cannot prove SETNX is
+ * actually atomic under real contention. This test can.
+ *
+ * Two ways to point this at a real Redis, both real infrastructure:
+ *  - Default: Testcontainers starts a throwaway redis:7.2-alpine container.
+ *  - Override: -Dsentinelx.it.redis.host=<host> -Dsentinelx.it.redis.port=<port>
+ *    connects to an already-running instance instead (e.g. the project's
+ *    own docker-compose Redis) -- for environments where the local Docker
+ *    Desktop's API doesn't negotiate with Testcontainers' bundled
+ *    docker-java client (a real, confirmed incompatibility independent of
+ *    this codebase, reproduced identically over Windows npipe, native
+ *    Linux Unix socket, and two Testcontainers major versions).
  */
-@Testcontainers
 class DistributedLockRedisIntegrationTest {
 
-    @Container
-    static final GenericContainer<?> REDIS = new GenericContainer<>(DockerImageName.parse("redis:7.2-alpine"))
-            .withExposedPorts(6379);
+    private static GenericContainer<?> ownedContainer;
+    private static String host;
+    private static int port;
+
+    @BeforeAll
+    static void resolveRedis() {
+        String overrideHost = System.getProperty("sentinelx.it.redis.host");
+        if (overrideHost != null) {
+            host = overrideHost;
+            port = Integer.parseInt(System.getProperty("sentinelx.it.redis.port", "6379"));
+            return;
+        }
+        ownedContainer = new GenericContainer<>(DockerImageName.parse("redis:7.2-alpine")).withExposedPorts(6379);
+        ownedContainer.start();
+        host = ownedContainer.getHost();
+        port = ownedContainer.getMappedPort(6379);
+    }
+
+    @AfterAll
+    static void stopOwnedContainer() {
+        if (ownedContainer != null) {
+            ownedContainer.stop();
+        }
+    }
 
     private LettuceConnectionFactory connectionFactory;
 
     private DistributedLockService newLockService() {
-        RedisStandaloneConfiguration config = new RedisStandaloneConfiguration(REDIS.getHost(), REDIS.getMappedPort(6379));
+        RedisStandaloneConfiguration config = new RedisStandaloneConfiguration(host, port);
         connectionFactory = new LettuceConnectionFactory(config);
         connectionFactory.afterPropertiesSet();
         StringRedisTemplate template = new StringRedisTemplate(connectionFactory);
@@ -54,7 +84,7 @@ class DistributedLockRedisIntegrationTest {
     @Test
     void exactlyOneOfManyConcurrentThreadsAcquiresTheSameResponderLock() throws InterruptedException, ExecutionException {
         DistributedLockService lockService = newLockService();
-        String responderId = "resp-concurrency-test";
+        String responderId = "resp-concurrency-test-" + System.nanoTime();
         int contenderCount = 20;
 
         ExecutorService pool = Executors.newFixedThreadPool(contenderCount);
@@ -94,7 +124,7 @@ class DistributedLockRedisIntegrationTest {
     @Test
     void lockReleaseByNonOwnerIsRejectedAgainstRealRedis() {
         DistributedLockService lockService = newLockService();
-        String responderId = "resp-release-test";
+        String responderId = "resp-release-test-" + System.nanoTime();
 
         assertTrue(lockService.tryAcquire(responderId, "inc-owner"), "owner must acquire the real lock");
         // A different incident releasing must not remove the real owner's lock

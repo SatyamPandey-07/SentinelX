@@ -6,6 +6,8 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.sentinelx.search.model.IncidentDocument;
 import com.sentinelx.search.service.SearchIndexService;
 import org.apache.hc.core5.http.HttpHost;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.opensearch.client.json.jackson.JacksonJsonpMapper;
@@ -13,8 +15,6 @@ import org.opensearch.client.opensearch.OpenSearchClient;
 import org.opensearch.client.transport.OpenSearchTransport;
 import org.opensearch.client.transport.httpclient5.ApacheHttpClient5TransportBuilder;
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 import org.testcontainers.containers.wait.strategy.Wait;
 
@@ -26,7 +26,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Real integration test against a genuine OpenSearch container (Section
+ * Real integration test against a genuine OpenSearch cluster (Section
  * 10/28) -- not the in-memory fallback SearchIndexService uses when
  * OpenSearch is unreachable (that path is what DuplicateDetectionTest
  * already covers as a plain unit test). This proves the actual OpenSearch
@@ -36,17 +36,44 @@ import static org.junit.jupiter.api.Assertions.*;
  *   "If five users report 'Smoke coming from chemistry laboratory' within
  *   100 meters and 5 minutes, the system should detect potential
  *   duplication."
+ *
+ * Default: Testcontainers starts a throwaway OpenSearch container.
+ * Override: -Dsentinelx.it.opensearch.host=<host> -Dsentinelx.it.opensearch.port=<port>
+ * connects to an already-running instance instead -- see
+ * DistributedLockRedisIntegrationTest's class javadoc for why this
+ * fallback exists on this particular host.
  */
-@Testcontainers
 class OpenSearchIntegrationTest {
 
-    @Container
-    static final GenericContainer<?> OPENSEARCH = new GenericContainer<>(DockerImageName.parse("opensearchproject/opensearch:2.11.1"))
-            .withEnv("discovery.type", "single-node")
-            .withEnv("DISABLE_SECURITY_PLUGIN", "true")
-            .withEnv("OPENSEARCH_JAVA_OPTS", "-Xms512m -Xmx512m")
-            .withExposedPorts(9200)
-            .waitingFor(Wait.forHttp("/_cluster/health").forStatusCode(200).withStartupTimeout(Duration.ofMinutes(2)));
+    private static GenericContainer<?> ownedContainer;
+    private static String host;
+    private static int port;
+
+    @BeforeAll
+    static void resolveOpenSearch() {
+        String overrideHost = System.getProperty("sentinelx.it.opensearch.host");
+        if (overrideHost != null) {
+            host = overrideHost;
+            port = Integer.parseInt(System.getProperty("sentinelx.it.opensearch.port", "9200"));
+            return;
+        }
+        ownedContainer = new GenericContainer<>(DockerImageName.parse("opensearchproject/opensearch:2.11.1"))
+                .withEnv("discovery.type", "single-node")
+                .withEnv("DISABLE_SECURITY_PLUGIN", "true")
+                .withEnv("OPENSEARCH_JAVA_OPTS", "-Xms512m -Xmx512m")
+                .withExposedPorts(9200)
+                .waitingFor(Wait.forHttp("/_cluster/health").forStatusCode(200).withStartupTimeout(Duration.ofMinutes(2)));
+        ownedContainer.start();
+        host = ownedContainer.getHost();
+        port = ownedContainer.getMappedPort(9200);
+    }
+
+    @AfterAll
+    static void stopOwnedContainer() {
+        if (ownedContainer != null) {
+            ownedContainer.stop();
+        }
+    }
 
     private SearchIndexService searchIndexService;
 
@@ -56,7 +83,7 @@ class OpenSearchIntegrationTest {
                 .registerModule(new JavaTimeModule())
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
-        HttpHost httpHost = new HttpHost("http", OPENSEARCH.getHost(), OPENSEARCH.getMappedPort(9200));
+        HttpHost httpHost = new HttpHost("http", host, port);
         OpenSearchTransport transport = ApacheHttpClient5TransportBuilder.builder(httpHost)
                 .setMapper(new JacksonJsonpMapper(objectMapper))
                 .build();
