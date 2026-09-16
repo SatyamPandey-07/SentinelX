@@ -6,11 +6,16 @@ import { Navbar } from '@/components/Navbar';
 import { Sidebar } from '@/components/Sidebar';
 import { SmoothScrollProvider } from '@/components/SmoothScrollProvider';
 import { PageTransition } from '@/components/PageTransition';
+import { useRequireAuth } from '@/hooks/useRequireAuth';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isLandingPage = pathname === '/';
   const isAuthPage = pathname === '/login';
+  // Hooks must run unconditionally -- the guard itself no-ops (and never
+  // redirects) for the landing/login routes via the isProtected flag below.
+  const isProtected = !isLandingPage && !isAuthPage;
+  const authReady = useRequireAuth(isProtected);
 
   if (isLandingPage) {
     return (
