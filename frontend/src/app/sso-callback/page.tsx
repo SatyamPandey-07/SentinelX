@@ -4,14 +4,39 @@ import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { AuthenticateWithRedirectCallback, useUser } from '@clerk/nextjs';
 import { persistSession, AuthSession, isSuperAdmin } from '@/lib/auth';
+import { useClerkConfigured } from '@/components/ClerkProviderWrapper';
 
 // This page only ever runs mid-OAuth-redirect with real query params from
-// Clerk -- it must never be statically prerendered (which would also try
-// to mount useUser()/AuthenticateWithRedirectCallback without a configured
-// ClerkProvider in an environment like CI where no Clerk key is set).
+// Clerk -- it must never be statically prerendered.
 export const dynamic = 'force-dynamic';
 
+// `force-dynamic` alone isn't enough: Next.js still performs a build-time
+// SSR pass of 'use client' pages to produce their initial HTML shell, and
+// in CI (no NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY set) ClerkProviderWrapper
+// correctly skips mounting <ClerkProvider> -- so useUser(), called
+// directly in this component, threw "can only be used within a
+// <ClerkProvider>" during that pass and failed the build (reproduced
+// live in CI; a local build with a real key set never hits this path,
+// which is why an earlier fix here looked correct but wasn't). The actual
+// fix: isolate the Clerk-dependent hook in a child component that only
+// ever mounts once useClerkConfigured() confirms a real <ClerkProvider>
+// exists, so useUser() is never called without one -- same pattern as
+// ClerkGate.tsx's SafeSignedIn/SafeSignedOut/SafeUserButton.
 export default function SSOCallbackPage() {
+  const configured = useClerkConfigured();
+
+  if (!configured) {
+    return (
+      <div className="min-h-screen bg-[#060911] flex flex-col items-center justify-center text-xs font-mono text-red-400 space-y-3">
+        <p>OAUTH IS NOT CONFIGURED ON THIS DEPLOYMENT.</p>
+      </div>
+    );
+  }
+
+  return <SSOCallbackInner />;
+}
+
+function SSOCallbackInner() {
   const router = useRouter();
   const { user, isLoaded } = useUser();
 

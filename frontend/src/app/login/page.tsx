@@ -23,7 +23,7 @@ import {
   Info,
 } from 'lucide-react';
 import { authenticate, registerUser, persistSession, AuthSession, isSuperAdmin, SUPER_ADMINS } from '@/lib/auth';
-import { useSignIn } from '@clerk/nextjs';
+import { useSafeSignIn } from '@/components/ClerkGate';
 
 type ViewMode = 'signup' | 'signin';
 type RoleChoice = 'USER' | 'ADMIN';
@@ -141,7 +141,7 @@ function LoginContent() {
     }
   };
 
-  const { signIn } = useSignIn();
+  const { signIn, bridge: clerkSignInBridge } = useSafeSignIn();
 
   // Clean Social Login (Google / Gmail & GitHub)
   const handleSocialAuth = async (provider: 'google' | 'github') => {
