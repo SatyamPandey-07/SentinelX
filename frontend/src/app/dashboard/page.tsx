@@ -28,12 +28,14 @@ import {
 import { MOCK_INCIDENTS, MOCK_RESPONDERS, Incident } from '@/lib/mock-data';
 import { AnimatedNumber } from '@/components/AnimatedNumber';
 
+const EASE_OUT = [0.16, 1, 0.3, 1] as const;
+
 const columnReveal = {
   hidden: { opacity: 0, y: 14 },
   show: (i: number) => ({
     opacity: 1,
     y: 0,
-    transition: { delay: i * 0.08, duration: 0.4, ease: [0.16, 1, 0.3, 1] },
+    transition: { delay: i * 0.08, duration: 0.4, ease: EASE_OUT },
   }),
 };
 
@@ -126,7 +128,7 @@ export default function DashboardPage() {
                     key={inc.id}
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.05 * idx, duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                    transition={{ delay: 0.05 * idx, duration: 0.3, ease: [0.16, 1, 0.3, 1] as const }}
                     whileHover={{ x: 2 }}
                     onClick={() => setSelectedIncident(inc)}
                     className={`w-full text-left p-3 rounded-lg border transition-colors ${
@@ -164,7 +166,7 @@ export default function DashboardPage() {
                         {inc.status}
                       </span>
                     </div>
-                  </button>
+                  </motion.button>
                 );
               })}
             </div>
@@ -304,7 +306,7 @@ export default function DashboardPage() {
             initial={{ opacity: 0, x: 8 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -8 }}
-            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] as const }}
             className="space-y-4">
             {/* Header & Severity */}
             <div className="flex items-center justify-between pb-3 border-b border-white/[0.08]">
@@ -397,12 +399,14 @@ export default function DashboardPage() {
               >
                 DETAILS
               </Link>
-              <button
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.97 }}
                 onClick={() => handleAction('RESOLVE')}
                 className="py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold font-mono transition-colors"
               >
                 RESOLVE
-              </button>
+              </motion.button>
             </div>
           </div>
 

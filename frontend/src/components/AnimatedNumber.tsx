@@ -20,7 +20,7 @@ export function AnimatedNumber({
   useEffect(() => {
     const controls = animate(prevValue.current, value, {
       duration,
-      ease: [0.16, 1, 0.3, 1],
+      ease: [0.16, 1, 0.3, 1] as const,
       onUpdate: (v) => setDisplay(v),
     });
     prevValue.current = value;

@@ -65,7 +65,7 @@ export default function LoginPage() {
       <motion.div
         initial={{ opacity: 0, y: 18, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] as const }}
         className="w-full max-w-md bg-slate-900/70 border border-slate-800 rounded-2xl p-8 relative z-10 shadow-2xl shadow-black/50 backdrop-blur-xl space-y-6"
       >
         {/* Header */}
