@@ -1,55 +1,32 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Bot, Send, ShieldCheck, Sparkles, BookOpen, Terminal, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { Send, ShieldCheck, Sparkles, BookOpen, Terminal, AlertTriangle, Loader2 } from 'lucide-react';
+import { queryRag, RagQueryResponse, ApiError } from '@/lib/api';
 
 export default function IntelligencePage() {
-  const [query, setQuery] = useState('What should responders do for a chemical spill in Laboratory Block B?');
-  const [response, setResponse] = useState<{
-    title: string;
-    steps: string[];
-    citations: { doc: string; section: string; relevance: number }[];
-  } | null>({
-    title: "RECOMMENDED RESPONSE: HAZMAT VOLATILE SOLVENT PROTOCOL",
-    steps: [
-      "1. Isolate affected zone: Establish a 100-meter exclusion boundary upwind and seal all corridor fire doors.",
-      "2. Notify safety team: Alert Campus Environmental Health & Safety (EHS ext. 4400) and dispatch Level B PPE team.",
-      "3. Dispatch trained responder: Deploy Unit #R-119 (Hazmat Certified) equipped with sodium bicarbonate neutralizer kit H-4.",
-      "4. Begin evacuation protocol: Order immediate vertical evacuation of Laboratory Block B, floors 2 through 4, and cut HVAC zone dampers."
-    ],
-    citations: [
-      { doc: "Campus Chemical & Toxic Fume Containment Protocol (SOP-03)", section: "Section 4.2 - Laboratory Spill Exclusion Perimeters", relevance: 0.96 },
-      { doc: "Hazardous Chemical Neutralization Manual (SOP-HAZ-2024)", section: "Section 1.8 - Acid & Solvent Neutralization Procedures", relevance: 0.91 }
-    ]
-  });
-
+  const [query, setQuery] = useState('What should responders do for a chemical spill in a lab?');
+  const [response, setResponse] = useState<RagQueryResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) return;
     setLoading(true);
-
-    setTimeout(() => {
-      setResponse({
-        title: "RECOMMENDED RESPONSE: INCIDENT CONTAINMENT DIRECTIVE",
-        steps: [
-          "1. Verify exact incident coordinates via Location Service gRPC and ensure responder lock is acquired.",
-          "2. Enforce standard operational containment per relevant SOP binder section.",
-          "3. Dispatch primary specialist unit within target SLA window (< 2.0m for CRITICAL).",
-          "4. Record cryptographic audit event upon every state transition to prevent ledger tampering."
-        ],
-        citations: [
-          { doc: "Campus Standard Operating Procedures Master Index", section: "Section 2.1 - General Emergency Response", relevance: 0.94 }
-        ]
-      });
+    setError(null);
+    try {
+      setResponse(await queryRag(query));
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Unable to reach ai-service');
+    } finally {
       setLoading(false);
-    }, 500);
+    }
   };
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
-      
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/[0.08]">
         <div>
@@ -57,7 +34,7 @@ export default function IntelligencePage() {
             <span>VIGIL INTELLIGENCE // GROUNDED SOP ASSISTANT</span>
           </h1>
           <p className="text-xs text-slate-400 font-mono mt-1">
-            QDRANT VECTOR RETRIEVAL // ZERO-TEMPERATURE GENERATION ($T=0.0$) // STRICT FACTUAL CITATIONS
+            LIVE: POST /api/v1/ai/rag/query // QDRANT VECTOR RETRIEVAL // STRICT FACTUAL CITATIONS
           </p>
         </div>
 
@@ -87,11 +64,18 @@ export default function IntelligencePage() {
             disabled={loading}
             className="px-6 py-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold text-xs font-mono flex items-center gap-2 transition-colors disabled:opacity-50"
           >
-            <Send className="w-3.5 h-3.5" />
+            {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
             <span>{loading ? 'RETRIEVING...' : 'QUERY SOP'}</span>
           </button>
         </form>
       </div>
+
+      {error && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-mono">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+          {error}
+        </div>
+      )}
 
       {/* Response Display Box */}
       {response && (
@@ -99,23 +83,16 @@ export default function IntelligencePage() {
           <div className="flex items-center justify-between pb-3 border-b border-white/[0.08]">
             <span className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-2">
               <ShieldCheck className="w-4 h-4 text-cyan-400" />
-              {response.title}
+              GROUNDED RESPONSE (confidence {(response.confidence * 100).toFixed(0)}%)
             </span>
             <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
               GROUNDED
             </span>
           </div>
 
-          <div className="space-y-3 font-mono text-xs">
-            <span className="text-slate-400 font-bold uppercase text-[10px]">Step-by-Step Action Items:</span>
-            <div className="space-y-2">
-              {response.steps.map((step, idx) => (
-                <div key={idx} className="p-3 rounded-lg bg-slate-900/60 border border-slate-800 text-slate-200">
-                  {step}
-                </div>
-              ))}
-            </div>
-          </div>
+          <p className="text-xs font-mono text-slate-200 leading-relaxed whitespace-pre-line">{response.answer}</p>
+
+          <p className="text-[10px] font-mono text-slate-500 italic">{response.disclaimer}</p>
 
           {/* Citations Box */}
           <div className="pt-4 border-t border-white/[0.08] space-y-2 font-mono">
@@ -127,8 +104,8 @@ export default function IntelligencePage() {
               {response.citations.map((cite, i) => (
                 <div key={i} className="p-3 rounded-lg bg-slate-950 border border-slate-800 space-y-1 text-xs">
                   <div className="flex items-center justify-between">
-                    <span className="text-purple-300 font-bold text-[11px] truncate">{cite.doc}</span>
-                    <span className="text-[10px] text-emerald-400">Score: {cite.relevance}</span>
+                    <span className="text-purple-300 font-bold text-[11px] truncate">{cite.document_name}</span>
+                    <span className="text-[10px] text-emerald-400">Score: {cite.relevance_score.toFixed(2)}</span>
                   </div>
                   <span className="text-[10px] text-slate-500 block">{cite.section}</span>
                 </div>
