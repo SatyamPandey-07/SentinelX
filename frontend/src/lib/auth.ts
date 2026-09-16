@@ -434,6 +434,11 @@ export async function registerUser(payload: RegisterPayload): Promise<AuthSessio
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 2500);
 
+    // No `role` field sent: the backend never trusts a client-supplied role
+    // on public self-registration (every new account is ROLE_USER there,
+    // regardless of what's sent) -- Afifa/Satyam are real seeded ROLE_ADMIN
+    // accounts instead, so signing up with their email correctly fails as
+    // "already registered" rather than this code path ever running for them.
     const res = await fetch(`${API_BASE}/api/v1/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -444,7 +449,6 @@ export async function registerUser(payload: RegisterPayload): Promise<AuthSessio
         first_name: payload.first_name,
         last_name: payload.last_name,
         phone: payload.phone || '+10000000000',
-        role: regSuperAdmin ? 'ADMIN' : 'USER',
       }),
       signal: controller.signal,
     });

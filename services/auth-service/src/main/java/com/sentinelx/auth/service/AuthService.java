@@ -92,14 +92,13 @@ public class AuthService {
             throw new IllegalArgumentException("Email is already registered");
         }
 
-        String roleName = request.role() != null ? request.role().toUpperCase() : "USER";
-        if (!roleName.startsWith("ROLE_")) {
-            roleName = "ROLE_" + roleName;
-        }
-
-        RoleEntity role = roleRepository.findById(roleName)
-                .orElseGet(() -> roleRepository.findById("ROLE_USER")
-                        .orElseThrow(() -> new IllegalStateException("Default role ROLE_USER not found")));
+        // Public self-registration is never trusted to self-assign a role --
+        // any caller could otherwise POST {"role":"ADMIN"} and grant
+        // themselves full access. Every new account starts as ROLE_USER;
+        // elevation happens only via a DB-seeded account (see V3 migration)
+        // or a real admin promoting someone later, never at signup time.
+        RoleEntity role = roleRepository.findById("ROLE_USER")
+                .orElseThrow(() -> new IllegalStateException("Default role ROLE_USER not found"));
 
         String encodedPassword = passwordEncodingService.encode(request.password());
 

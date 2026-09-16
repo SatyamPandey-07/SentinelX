@@ -114,8 +114,8 @@ services:
       - cluster.name=sentinelx-search-cluster
       - node.name=sentinelx-search-node1
       - discovery.type=single-node
-      - bootstrap.memory_lock=true
-      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+      - bootstrap.memory_lock=false
+      - "OPENSEARCH_JAVA_OPTS=-Xms256m -Xmx384m"
       - DISABLE_SECURITY_PLUGIN=true
     ulimits:
       memlock:
