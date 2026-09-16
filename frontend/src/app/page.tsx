@@ -443,15 +443,17 @@ export default function LandingPage() {
               No shortcuts in the stack
             </h2>
             <p className="text-slate-400 text-sm mt-3 font-light">
-              Eleven Java/Python microservices behind one gateway, each with its own database where it matters.
+              Eleven Java/Python microservices behind one rate-limited gateway, each with its own database where it matters.
             </p>
           </Reveal>
 
           <Reveal>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 text-center">
               {[
-                'Java 21', 'Spring Boot', 'Apache Kafka', 'Redis 7', 'PostgreSQL + PostGIS', 'OpenSearch',
-                'Python · FastAPI', 'Qdrant', 'Next.js 14', 'gRPC', 'OpenTelemetry', 'Docker Compose',
+                'Java 21', 'Spring Boot', 'Spring Security', 'Spring Cloud Gateway', 'Apache Kafka', 'Redis 7',
+                'PostgreSQL + PostGIS', 'OpenSearch', 'Qdrant', 'gRPC', 'WebSocket · STOMP', 'Resilience4j',
+                'Flyway', 'Testcontainers', 'OpenAPI · Swagger', 'Python · FastAPI', 'Docker Compose', 'Kubernetes',
+                'GitHub Actions', 'Prometheus', 'Grafana', 'OpenTelemetry', 'Next.js 14', 'Go (Healthcheck CLI)',
               ].map((tech) => (
                 <div
                   key={tech}
