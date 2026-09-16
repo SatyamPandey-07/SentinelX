@@ -196,6 +196,27 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
                     <version>3.3.1</version>
+                    <configuration>
+                        <!--
+                            -Djdk.attach.allowAttachSelf=true: Mockito's
+                            default inline mock maker (needed to mock
+                            concrete classes like StringRedisTemplate, not
+                            just interfaces) uses Byte Buddy's JVM
+                            self-attach mechanism, blocked by default on
+                            some JDK 21 builds; reproduced running
+                            AnalyticsServiceTest.
+
+                            -Xmx512m: without an explicit cap, G1GC sizes
+                            its default max heap off total system RAM at
+                            JVM startup, not what's actually free; on a
+                            memory-constrained host that reservation itself
+                            fails ("insufficient memory... Native memory
+                            allocation (mmap) failed... G1 virtual space")
+                            before a single test class loads. A unit test's
+                            forked JVM has no real need for a multi-GB heap.
+                        -->
+                        <argLine>-Djdk.attach.allowAttachSelf=true -Xmx512m</argLine>
+                    </configuration>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>

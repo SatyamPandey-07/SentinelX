@@ -87,7 +87,10 @@ public class AnalyticsService {
         return result;
     }
 
-    private LatencyStats calculateLatencyStats(List<Long> values) {
+    // Package-private rather than private so AnalyticsServiceTest can
+    // exercise the percentile math directly with known inputs, instead of
+    // only indirectly through a fully mocked repository.
+    LatencyStats calculateLatencyStats(List<Long> values) {
         if (values.isEmpty()) {
             return new LatencyStats(0.0, 0.0, 0.0);
         }

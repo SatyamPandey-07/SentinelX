@@ -56,6 +56,14 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- OpenAPI/Swagger (Section 38): WebFlux variant, since the
+             gateway runs on Spring Cloud Gateway's reactive stack, not
+             a servlet container. -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
+        </dependency>
+
         <!-- Test dependencies -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
