@@ -25,50 +25,8 @@ import {
   ChevronRight,
   ExternalLink,
 } from 'lucide-react';
-import { getSession, AuthSession, formatDisplayName } from '@/lib/auth';
-
-interface UserIncident {
-  id: string;
-  title: string;
-  description: string;
-  category: string;
-  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
-  status: 'REPORTED' | 'ASSIGNED' | 'ACKNOWLEDGED' | 'IN_PROGRESS' | 'RESOLVED';
-  building: string;
-  floor: string;
-  reportedAt: string;
-  assignedResponder?: string;
-  etaMinutes?: number;
-}
-
-const INITIAL_USER_INCIDENTS: UserIncident[] = [
-  {
-    id: 'INC-2026-0812',
-    title: 'Medical Assistance Required - Student Fainted',
-    description: 'Student felt dizzy and collapsed in the library 3rd-floor study lounge. First aid kit on scene.',
-    category: 'MEDICAL',
-    severity: 'HIGH',
-    status: 'ACKNOWLEDGED',
-    building: 'Main Library',
-    floor: '3rd Floor - Quiet Zone',
-    reportedAt: '15 mins ago',
-    assignedResponder: 'Officer Daniels (Paramedic #R-104)',
-    etaMinutes: 2,
-  },
-  {
-    id: 'INC-2026-0790',
-    title: 'Water Leak in Chemistry Wing Corridor',
-    description: 'Overhead valve dripping near electrical conduits. Facilities notified.',
-    category: 'INFRASTRUCTURE',
-    severity: 'MEDIUM',
-    status: 'RESOLVED',
-    building: 'Science & Chemistry Hall',
-    floor: 'Ground Floor B-Wing',
-    reportedAt: '2 hours ago',
-    assignedResponder: 'Campus Facilities Dispatch #U-08',
-    etaMinutes: 0,
-  },
-];
+import { getSession, AuthSession } from '@/lib/auth';
+import { createIncident, listIncidents, Incident, IncidentCategory, ApiError } from '@/lib/api';
 
 const EMERGENCY_NUMBERS = [
   { name: 'Campus Police Emergency', number: '+1 (555) 911-0001', ext: 'Ext. 5555', role: 'Immediate armed & safety response' },
@@ -77,13 +35,12 @@ const EMERGENCY_NUMBERS = [
   { name: '24/7 Campus Crisis Hotline', number: '+1 (555) 911-0004', ext: 'Ext. 5558', role: 'Confidential mental health & safety' },
 ];
 
-import { getSharedIncidents, saveSharedIncident, IncidentRecord } from '@/lib/incident-store';
-
 export default function UserPortalPage() {
   const [session, setSession] = useState<AuthSession | null>(null);
-  const [incidents, setIncidents] = useState<IncidentRecord[]>([]);
+  const [incidents, setIncidents] = useState<Incident[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
+  const [errorToast, setErrorToast] = useState<string | null>(null);
 
   // Form State
   const [title, setTitle] = useState('');
@@ -93,93 +50,110 @@ export default function UserPortalPage() {
   const [building, setBuilding] = useState('Engineering Block A');
   const [floor, setFloor] = useState('2nd Floor, Room 204');
 
+  const syncIncidents = async (currentSession: AuthSession | null) => {
+    try {
+      const page = await listIncidents({ size: 50 });
+      const mine = currentSession
+        ? page.content.filter((i) => i.reporter_id === currentSession.user_id)
+        : page.content;
+      setIncidents(mine);
+    } catch {
+      // Real backend unreachable -- show nothing rather than fabricate data.
+      setIncidents([]);
+    }
+  };
+
   useEffect(() => {
     const curSession = getSession();
     setSession(curSession);
-
-    const syncIncidents = () => {
-      const all = getSharedIncidents();
-      setIncidents(all);
-    };
-    syncIncidents();
+    syncIncidents(curSession);
 
     const onAuthChange = () => setSession(getSession());
     window.addEventListener('sentinelx_auth_change', onAuthChange);
-    window.addEventListener('sentinelx_incidents_updated', syncIncidents);
 
     return () => {
       window.removeEventListener('sentinelx_auth_change', onAuthChange);
-      window.removeEventListener('sentinelx_incidents_updated', syncIncidents);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleReportSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitting(true);
+  const submitIncident = async (input: {
+    title: string;
+    description: string;
+    category: IncidentCategory;
+    severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+    building: string;
+    floor: string;
+  }) => {
+    // Real GPS when the browser grants it, otherwise a campus-quad default --
+    // never fabricated per-incident coordinates.
+    const coords = await new Promise<{ lat: number; lon: number }>((resolve) => {
+      if (typeof navigator === 'undefined' || !navigator.geolocation) {
+        resolve({ lat: 37.7749, lon: -122.4194 });
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+        () => resolve({ lat: 37.7749, lon: -122.4194 }),
+        { timeout: 2000 }
+      );
+    });
 
-    setTimeout(() => {
-      const newId = `INC-2026-${Math.floor(1000 + Math.random() * 9000)}`;
-      const newReport: IncidentRecord = {
-        id: newId,
-        reporter_id: session?.user_id || session?.username || 'usr-campus',
-        reporter_name: formatDisplayName(session),
-        title,
-        description,
-        category: category as any,
-        severity,
-        status: severity === 'CRITICAL' ? 'ASSIGNED' : 'REPORTED',
-        location: {
-          latitude: 37.7749,
-          longitude: -122.4194,
-          building,
-          floor,
-          zone_id: 'ZONE_NORTH',
-          address: 'Campus Quad',
-        },
-        sla_ack_deadline: new Date(Date.now() + 1000 * 300).toISOString(),
-        created_at: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        assigned_responder_id: severity === 'CRITICAL' ? 'R-104' : undefined,
-        assigned_responder_name: severity === 'CRITICAL' ? 'Paramedic Unit #R-104 (Marcus Vance)' : undefined,
-      };
+    const created = await createIncident({
+      title: input.title,
+      description: input.description,
+      category: input.category,
+      severity: input.severity,
+      location: {
+        latitude: coords.lat,
+        longitude: coords.lon,
+        building: input.building,
+        floor: input.floor,
+        zone_id: 'ZONE_NORTH',
+        address: 'Campus Quad',
+      },
+    });
 
-      saveSharedIncident(newReport);
-      setSubmitting(false);
-      setSuccessToast(`Emergency Incident ${newId} received! SentinelX Dispatch and nearest responders have been alerted.`);
-      setTitle('');
-      setDescription('');
-
-      setTimeout(() => setSuccessToast(null), 6000);
-    }, 500);
+    setIncidents((prev) => [created, ...prev]);
+    return created;
   };
 
-  const handleSos = () => {
-    const sosId = `SOS-${Math.floor(1000 + Math.random() * 9000)}`;
-    const sosIncident: IncidentRecord = {
-      id: sosId,
-      reporter_id: session?.user_id || session?.username || 'usr-campus',
-      reporter_name: session?.first_name ? `${session.first_name} ${session.last_name}` : (session?.username || 'Campus Reporter'),
-      title: '🚨 IMMEDIATE PANIC / SOS SIGNAL ACTIVATED',
-      description: 'Instant distress signal triggered by campus community reporter. GPS telemetry broadcast to campus police and nearest patrol units.',
-      category: 'SECURITY',
-      severity: 'CRITICAL',
-      status: 'ASSIGNED',
-      location: {
-        latitude: 37.7749,
-        longitude: -122.4194,
-        building: 'Current GPS Geofence (Engineering Quad)',
-        floor: 'Outdoor Beacon #12',
-        zone_id: 'ZONE_NORTH',
-        address: 'Campus Central Quad',
-      },
-      sla_ack_deadline: new Date(Date.now() + 1000 * 60).toISOString(),
-      created_at: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      assigned_responder_id: 'R-104',
-      assigned_responder_name: 'Armed Campus Patrol #P-02 & Paramedic Unit #R-104',
-    };
+  const handleReportSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setErrorToast(null);
 
-    saveSharedIncident(sosIncident);
-    setSuccessToast(`SOS SIGNAL BROADCAST! Tactical dispatch units and security patrols are en route.`);
-    setTimeout(() => setSuccessToast(null), 7000);
+    try {
+      const created = await submitIncident({ title, description, category, severity, building, floor });
+      setSuccessToast(`Emergency Incident ${created.id.slice(0, 8)} received! SentinelX Dispatch and nearest responders have been alerted.`);
+      setTitle('');
+      setDescription('');
+      setTimeout(() => setSuccessToast(null), 6000);
+    } catch (err) {
+      setErrorToast(err instanceof ApiError ? err.message : 'Could not reach SentinelX Dispatch. Please try again.');
+      setTimeout(() => setErrorToast(null), 6000);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSos = async () => {
+    setErrorToast(null);
+    try {
+      const created = await submitIncident({
+        title: '🚨 IMMEDIATE PANIC / SOS SIGNAL ACTIVATED',
+        description: 'Instant distress signal triggered by campus community reporter. GPS telemetry broadcast to campus police and nearest patrol units.',
+        category: 'SECURITY',
+        severity: 'CRITICAL',
+        building: 'Current GPS Geofence',
+        floor: 'Outdoor Beacon',
+      });
+      setSuccessToast(`SOS SIGNAL BROADCAST! Incident ${created.id.slice(0, 8)} -- tactical dispatch units and security patrols are en route.`);
+      setTimeout(() => setSuccessToast(null), 7000);
+    } catch (err) {
+      setErrorToast(err instanceof ApiError ? err.message : 'SOS failed to reach SentinelX Dispatch. Call emergency services directly.');
+      setTimeout(() => setErrorToast(null), 7000);
+    }
   };
 
   return (
@@ -218,7 +192,7 @@ export default function UserPortalPage() {
         </motion.button>
       </div>
 
-      {/* Success Notification Toast */}
+      {/* Success / Error Notification Toast */}
       <AnimatePresence>
         {successToast && (
           <motion.div
@@ -229,6 +203,17 @@ export default function UserPortalPage() {
           >
             <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
             <span>{successToast}</span>
+          </motion.div>
+        )}
+        {errorToast && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="p-4 rounded-xl bg-red-950/40 border border-red-500/50 text-red-300 text-xs font-mono flex items-center gap-3 shadow-lg shadow-red-950/40"
+          >
+            <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" />
+            <span>{errorToast}</span>
           </motion.div>
         )}
       </AnimatePresence>
@@ -431,19 +416,24 @@ export default function UserPortalPage() {
                   <div className="pt-1 flex items-center justify-between text-[10px] font-mono text-slate-400 border-t border-slate-800/60">
                     <div className="flex items-center gap-1">
                       <MapPin className="w-3 h-3 text-slate-500" />
-                      <span>{item.location?.building || (item as any).building || 'Campus Quad'}</span>
+                      <span>{item.location?.building || 'Campus Quad'}</span>
                     </div>
-                    <span>{item.created_at || (item as any).reportedAt || 'Just now'}</span>
+                    <span>{new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
 
-                  {(item.assigned_responder_name || (item as any).assignedResponder) && (
+                  {item.assigned_responder_id && (
                     <div className="p-2 rounded-lg bg-cyan-950/30 border border-cyan-500/30 text-[10px] font-mono text-cyan-300 flex items-center justify-between">
-                      <span>Assigned: {item.assigned_responder_name || (item as any).assignedResponder}</span>
+                      <span>Assigned responder: {item.assigned_responder_id}</span>
                       <span className="text-emerald-400 font-bold">READY</span>
                     </div>
                   )}
                 </div>
               ))}
+              {incidents.length === 0 && (
+                <div className="p-4 text-center text-[11px] font-mono text-slate-500">
+                  No incidents reported yet. Submit one on the left to see it appear here in real time.
+                </div>
+              )}
             </div>
           </div>
 

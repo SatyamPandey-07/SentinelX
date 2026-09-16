@@ -34,7 +34,7 @@ import {
   updateDelegatedUserRole,
   UserRole,
 } from '@/lib/auth';
-import { getSharedIncidents } from '@/lib/incident-store';
+import { listIncidents } from '@/lib/api';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -56,11 +56,12 @@ export default function ProfilePage() {
     const cur = getSession();
     setSession(cur);
     if (cur) {
-      const incidents = getSharedIncidents();
-      const myCount = incidents.filter(
-        (i) => i.reporter_id === cur.user_id || i.reporter_id === cur.username || i.reporter_id.startsWith('usr-')
-      ).length;
-      setIncidentCount(myCount);
+      listIncidents({ size: 100 })
+        .then((page) => {
+          const myCount = page.content.filter((i) => i.reporter_id === cur.user_id).length;
+          setIncidentCount(myCount);
+        })
+        .catch(() => setIncidentCount(0));
 
       if (isSuperAdmin(cur.email, cur.username) || cur.role === 'ROLE_ADMIN') {
         setUserDirectory(getRBACUserDirectory());

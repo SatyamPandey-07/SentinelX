@@ -15,7 +15,6 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { listIncidents, createIncident, Incident, IncidentCategory, IncidentSeverity, ApiError } from '@/lib/api';
-import { getSharedIncidents } from '@/lib/incident-store';
 
 const CATEGORIES: IncidentCategory[] = [
   'FIRE', 'MEDICAL', 'SECURITY', 'HAZMAT', 'INFRASTRUCTURE', 'ELECTRICAL',
@@ -43,14 +42,10 @@ export default function IncidentsPage() {
   const load = useCallback(async () => {
     try {
       const page = await listIncidents({ size: 100 });
-      const shared = getSharedIncidents();
-      const combined = [...shared, ...page.content.filter((p) => !shared.some((s) => s.id === p.id))];
-      setIncidents(combined as any);
+      setIncidents(page.content);
       setError(null);
-    } catch {
-      const shared = getSharedIncidents();
-      setIncidents(shared as any);
-      setError(null);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not reach incident-service.');
     } finally {
       setLoading(false);
     }
@@ -59,15 +54,7 @@ export default function IncidentsPage() {
   useEffect(() => {
     load();
     const poll = setInterval(load, 10000);
-    const onUpdated = () => {
-      const shared = getSharedIncidents();
-      setIncidents(shared as any);
-    };
-    window.addEventListener('sentinelx_incidents_updated', onUpdated);
-    return () => {
-      clearInterval(poll);
-      window.removeEventListener('sentinelx_incidents_updated', onUpdated);
-    };
+    return () => clearInterval(poll);
   }, [load]);
 
   const filtered = incidents.filter((i) => {

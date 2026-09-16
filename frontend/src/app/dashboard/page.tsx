@@ -30,7 +30,6 @@ import {
   Responder,
   ApiError,
 } from '@/lib/api';
-import { getSharedIncidents, updateSharedIncidentStatus } from '@/lib/incident-store';
 
 const EASE_OUT = [0.16, 1, 0.3, 1] as const;
 
@@ -90,18 +89,12 @@ export default function DashboardPage() {
         listIncidents({ size: 20 }),
         listResponders().catch(() => [] as Responder[]),
       ]);
-      const shared = getSharedIncidents();
-      const combined = [...shared, ...incidentPage.content.filter((p) => !shared.some((s) => s.id === p.id))];
-      setIncidents(combined as any);
+      setIncidents(incidentPage.content);
       setResponders(responderList);
       setError(null);
-      setSelectedId((prev) => prev ?? combined[0]?.id ?? null);
-    } catch {
-      // Fallback to shared incidents store (includes user-reported incidents)
-      const shared = getSharedIncidents();
-      setIncidents(shared as any);
-      setSelectedId((prev) => prev ?? shared[0]?.id ?? null);
-      setError(null);
+      setSelectedId((prev) => prev ?? incidentPage.content[0]?.id ?? null);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not reach incident-service.');
     } finally {
       setLoading(false);
     }
@@ -112,16 +105,9 @@ export default function DashboardPage() {
     const poll = setInterval(load, 8000);
     const clock = setInterval(() => forceTick((t) => t + 1), 1000);
 
-    const onIncidentsUpdated = () => {
-      const shared = getSharedIncidents();
-      setIncidents(shared as any);
-    };
-    window.addEventListener('sentinelx_incidents_updated', onIncidentsUpdated);
-
     return () => {
       clearInterval(poll);
       clearInterval(clock);
-      window.removeEventListener('sentinelx_incidents_updated', onIncidentsUpdated);
     };
   }, [load]);
 
@@ -130,19 +116,17 @@ export default function DashboardPage() {
   const handleAction = async (action: 'ACKNOWLEDGE' | 'RESOLVE') => {
     if (!selectedIncident || actionPending) return;
     setActionPending(true);
-    const newStatus = action === 'ACKNOWLEDGE' ? 'ACKNOWLEDGED' : 'RESOLVED';
     try {
-      if (action === 'ACKNOWLEDGE') {
-        await acknowledgeIncident(selectedIncident.id);
-      } else {
-        await resolveIncident(selectedIncident.id);
-      }
-    } catch {
-      // Offline fallback handling
+      const updated = action === 'ACKNOWLEDGE'
+        ? await acknowledgeIncident(selectedIncident.id)
+        : await resolveIncident(selectedIncident.id);
+      setIncidents((prev) => prev.map((i) => (i.id === selectedIncident.id ? updated : i)));
+      setError(null);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : `Failed to ${action.toLowerCase()} incident.`);
+    } finally {
+      setActionPending(false);
     }
-    updateSharedIncidentStatus(selectedIncident.id, newStatus);
-    setIncidents((prev) => prev.map((i) => (i.id === selectedIncident.id ? { ...i, status: newStatus } : i)));
-    setActionPending(false);
   };
 
   const respondersById = new Map(responders.map((r) => [r.id, r]));
