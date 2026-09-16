@@ -105,6 +105,16 @@ resilience4j:
         failureRateThreshold: 50
         waitDurationInOpenState: 5000
         permittedNumberOfCallsInHalfOpenState: 3
+  timelimiter:
+    instances:
+      # Without this, resilience4j-reactor's default 1s TimeLimiter wraps
+      # the CircuitBreaker gateway filter and fires well before a normal
+      # (sub-100ms) incident-service response returns under any real load
+      # or JIT warmup -- observed live: POST /api/v1/incidents through the
+      # gateway consistently timed out at ~1.01s and opened the circuit,
+      # even though a direct call to incident-service completed in 36ms.
+      incidentCircuitBreaker:
+        timeoutDuration: 4000ms
 
 management:
   endpoints:
