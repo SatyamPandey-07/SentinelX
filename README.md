@@ -201,4 +201,5 @@ k6 run tests/load/incident_creation_load.js
 | [docs/FAILURE_HANDLING.md](file:///d:/VIGIL/docs/FAILURE_HANDLING.md) | Graceful degradation matrix for broker, database, and AI outages |
 | [docs/TESTING.md](file:///d:/VIGIL/docs/TESTING.md) | Unit, integration, chaos engineering, and k6 load testing execution |
 | [docs/CI_CD.md](file:///d:/VIGIL/docs/CI_CD.md) | GitHub Actions CI/CD workflows, quality gates, and container security scanning |
-| [d
+| [docs/OPERATIONS_LINUX.md](file:///d:/VIGIL/docs/OPERATIONS_LINUX.md) | Linux OS internals, JVM memory vs Cgroups, socket states, and CLI diagnostics |
+| [docs/adr/](file:///d:/VIGIL/docs/adr) | 12 Architecture Decision Records (ADR-001 through ADR-012) |
