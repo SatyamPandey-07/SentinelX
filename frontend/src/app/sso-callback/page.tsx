@@ -5,6 +5,12 @@ import { useRouter } from 'next/navigation';
 import { AuthenticateWithRedirectCallback, useUser } from '@clerk/nextjs';
 import { persistSession, AuthSession, isSuperAdmin } from '@/lib/auth';
 
+// This page only ever runs mid-OAuth-redirect with real query params from
+// Clerk -- it must never be statically prerendered (which would also try
+// to mount useUser()/AuthenticateWithRedirectCallback without a configured
+// ClerkProvider in an environment like CI where no Clerk key is set).
+export const dynamic = 'force-dynamic';
+
 export default function SSOCallbackPage() {
   const router = useRouter();
   const { user, isLoaded } = useUser();

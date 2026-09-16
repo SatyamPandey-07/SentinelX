@@ -14,7 +14,7 @@ import {
   Crown,
 } from 'lucide-react';
 import { getSession, clearSession, AuthSession, formatDisplayName, isSuperAdmin } from '@/lib/auth';
-import { SignedIn, UserButton } from '@clerk/nextjs';
+import { SafeSignedIn as SignedIn, SafeUserButton as UserButton } from '@/components/ClerkGate';
 
 export function Navbar() {
   const router = useRouter();

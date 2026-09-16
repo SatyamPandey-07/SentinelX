@@ -33,7 +33,7 @@ import {
 import { gsap } from 'gsap';
 import { Campus3DVisualizer } from '@/components/Campus3DVisualizer';
 import { MOCK_INCIDENTS, MOCK_SERVICES_HEALTH } from '@/lib/mock-data';
-import { SignedIn, SignedOut, UserButton } from '@clerk/nextjs';
+import { SafeSignedIn as SignedIn, SafeSignedOut as SignedOut, SafeUserButton as UserButton } from '@/components/ClerkGate';
 
 export default function LandingPage() {
   const [activeStep, setActiveStep] = useState(0);
