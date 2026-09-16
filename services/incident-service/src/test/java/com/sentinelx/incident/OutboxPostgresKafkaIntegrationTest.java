@@ -22,12 +22,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
@@ -39,9 +41,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Real integration test for the Transactional Outbox pattern (Section 6/28):
- * a genuine PostgreSQL container (Flyway-migrated for real, not H2) and a
- * genuine Kafka broker, both via Testcontainers -- no mocks for the two
- * systems this pattern actually depends on.
+ * a genuine PostgreSQL database (Flyway-migrated for real, not H2) and a
+ * genuine Kafka broker -- no mocks for the two systems this pattern
+ * actually depends on.
  *
  * Proves, against real infrastructure:
  *  1. Creating an incident atomically inserts both the `incidents` row and
@@ -50,26 +52,55 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *  2. OutboxPublisher genuinely publishes the pending event to a real Kafka
  *     topic -- a real consumer on the real broker receives it -- and flips
  *     the outbox row's status to PUBLISHED in the real DB afterward.
+ *
+ * Default: Testcontainers starts throwaway Postgres + Kafka containers.
+ * Override: -Dsentinelx.it.postgres.host/.port (+ optionally .admin-user/
+ * .admin-password/.admin-db) and -Dsentinelx.it.kafka.bootstrap-servers
+ * connect to an already-running docker-compose stack instead -- see
+ * DistributedLockRedisIntegrationTest's class javadoc for why this
+ * fallback exists on this particular host. When overriding, a fresh
+ * `sentinelx_incident_test` database is created (if absent) on the
+ * pointed-at Postgres so this test never touches the real dev database.
  */
 @SpringBootTest
-@Testcontainers
 class OutboxPostgresKafkaIntegrationTest {
 
-    @Container
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(DockerImageName.parse("postgis/postgis:16-3.4-alpine").asCompatibleSubstituteFor("postgres"))
-            .withDatabaseName("sentinelx_incident_test")
-            .withUsername("test")
-            .withPassword("test");
-
-    @Container
-    static final KafkaContainer KAFKA = new KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.6.0"));
+    private static PostgreSQLContainer<?> ownedPostgres;
+    private static KafkaContainer ownedKafka;
 
     @DynamicPropertySource
     static void registerProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
-        registry.add("spring.datasource.username", POSTGRES::getUsername);
-        registry.add("spring.datasource.password", POSTGRES::getPassword);
-        registry.add("spring.kafka.bootstrap-servers", KAFKA::getBootstrapServers);
+        String pgHost = System.getProperty("sentinelx.it.postgres.host");
+        if (pgHost != null) {
+            int pgPort = Integer.parseInt(System.getProperty("sentinelx.it.postgres.port", "5432"));
+            String adminUser = System.getProperty("sentinelx.it.postgres.admin-user", "sentinelx_admin");
+            String adminPassword = System.getProperty("sentinelx.it.postgres.admin-password", "sentinelx_secret_password");
+            String adminDb = System.getProperty("sentinelx.it.postgres.admin-db", "sentinelx_auth");
+            createTestDatabaseIfAbsent(pgHost, pgPort, adminUser, adminPassword, adminDb, "sentinelx_incident_test");
+
+            registry.add("spring.datasource.url", () -> "jdbc:postgresql://" + pgHost + ":" + pgPort + "/sentinelx_incident_test");
+            registry.add("spring.datasource.username", () -> adminUser);
+            registry.add("spring.datasource.password", () -> adminPassword);
+        } else {
+            ownedPostgres = new PostgreSQLContainer<>(DockerImageName.parse("postgis/postgis:16-3.4-alpine").asCompatibleSubstituteFor("postgres"))
+                    .withDatabaseName("sentinelx_incident_test")
+                    .withUsername("test")
+                    .withPassword("test");
+            ownedPostgres.start();
+            registry.add("spring.datasource.url", ownedPostgres::getJdbcUrl);
+            registry.add("spring.datasource.username", ownedPostgres::getUsername);
+            registry.add("spring.datasource.password", ownedPostgres::getPassword);
+        }
+
+        String kafkaBootstrap = System.getProperty("sentinelx.it.kafka.bootstrap-servers");
+        if (kafkaBootstrap != null) {
+            registry.add("spring.kafka.bootstrap-servers", () -> kafkaBootstrap);
+        } else {
+            ownedKafka = new KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.6.0"));
+            ownedKafka.start();
+            registry.add("spring.kafka.bootstrap-servers", ownedKafka::getBootstrapServers);
+        }
+
         // Real HTTP calls to ai-service/search-service (neither is running
         // in this test) intentionally aren't mocked -- IncidentService is
         // designed to degrade gracefully to Optional.empty() on connection
@@ -77,6 +108,23 @@ class OutboxPostgresKafkaIntegrationTest {
         // that real fallback path rather than skipping it.
         registry.add("ai-service.base-url", () -> "http://localhost:1");
         registry.add("search-service.base-url", () -> "http://localhost:1");
+    }
+
+    private static void createTestDatabaseIfAbsent(String host, int port, String user, String password, String adminDb, String targetDb) {
+        String adminUrl = "jdbc:postgresql://" + host + ":" + port + "/" + adminDb;
+        try (Connection conn = DriverManager.getConnection(adminUrl, user, password);
+             Statement stmt = conn.createStatement()) {
+            stmt.execute("CREATE DATABASE " + targetDb);
+        } catch (SQLException e) {
+            if (!"42P04".equals(e.getSQLState())) { // 42P04 = duplicate_database, i.e. already exists
+                throw new RuntimeException("Failed to provision " + targetDb + " on " + adminUrl, e);
+            }
+        }
+    }
+
+    private static String resolveKafkaBootstrapServersForConsumer() {
+        String override = System.getProperty("sentinelx.it.kafka.bootstrap-servers");
+        return override != null ? override : ownedKafka.getBootstrapServers();
     }
 
     @Autowired
@@ -142,7 +190,7 @@ class OutboxPostgresKafkaIntegrationTest {
         // A real consumer, on the real Testcontainers Kafka broker,
         // subscribed to the exact topic the publisher writes to.
         Properties consumerProps = new Properties();
-        consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers());
+        consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, resolveKafkaBootstrapServersForConsumer());
         consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, "itest-consumer-" + System.nanoTime());
         consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
