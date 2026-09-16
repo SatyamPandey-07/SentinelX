@@ -13,6 +13,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { getSession, clearSession, AuthSession } from '@/lib/auth';
+import { SignedIn, SignedOut, UserButton } from '@clerk/nextjs';
 
 export function Navbar() {
   const router = useRouter();
@@ -118,6 +119,13 @@ export function Navbar() {
             </div>
           </div>
         </Link>
+
+        {/* Clerk User Button */}
+        <SignedIn>
+          <div className="flex items-center pl-1">
+            <UserButton afterSignOutUrl="/" />
+          </div>
+        </SignedIn>
 
         <button
           onClick={handleLogout}

@@ -33,6 +33,7 @@ import {
 import { gsap } from 'gsap';
 import { Campus3DVisualizer } from '@/components/Campus3DVisualizer';
 import { MOCK_INCIDENTS, MOCK_SERVICES_HEALTH } from '@/lib/mock-data';
+import { SignedIn, SignedOut, UserButton } from '@clerk/nextjs';
 
 export default function LandingPage() {
   const [activeStep, setActiveStep] = useState(0);
@@ -161,22 +162,34 @@ export default function LandingPage() {
         </nav>
 
         <div className="flex items-center gap-2.5">
-          <Link
-            href="/login?mode=signin"
-            id="nav-signin"
-            className="px-3.5 py-1.5 rounded-lg bg-slate-900/80 hover:bg-slate-800 text-slate-300 text-xs font-mono font-bold transition-all border border-slate-700"
-          >
-            SIGN IN
-          </Link>
+          <SignedOut>
+            <Link
+              href="/login?mode=signin"
+              id="nav-signin"
+              className="px-3.5 py-1.5 rounded-lg bg-slate-900/80 hover:bg-slate-800 text-slate-300 text-xs font-mono font-bold transition-all border border-slate-700"
+            >
+              SIGN IN
+            </Link>
 
-          <Link
-            href="/login?mode=signup"
-            id="nav-signup"
-            className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 text-white text-xs font-bold font-mono tracking-wider transition-all shadow-lg shadow-cyan-600/25 flex items-center gap-1.5 border border-cyan-400/30"
-          >
-            <span>SIGN UP</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
+            <Link
+              href="/login?mode=signup"
+              id="nav-signup"
+              className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 text-white text-xs font-bold font-mono tracking-wider transition-all shadow-lg shadow-cyan-600/25 flex items-center gap-1.5 border border-cyan-400/30"
+            >
+              <span>SIGN UP</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </SignedOut>
+
+          <SignedIn>
+            <Link
+              href="/user"
+              className="px-3.5 py-1.5 rounded-lg bg-cyan-950/50 border border-cyan-500/40 text-cyan-300 text-xs font-mono font-bold hover:bg-cyan-900/60 transition-colors"
+            >
+              MY SAFETY PORTAL
+            </Link>
+            <UserButton afterSignOutUrl="/" />
+          </SignedIn>
         </div>
       </header>
 

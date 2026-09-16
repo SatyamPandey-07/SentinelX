@@ -1,6 +1,7 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import { AppShell } from '@/components/AppShell';
+import { ClerkProviderWrapper } from '@/components/ClerkProviderWrapper';
 
 export const metadata: Metadata = {
   title: 'VIGIL | Distributed Emergency Operations & 3D Defense Platform',
@@ -15,7 +16,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className="bg-background text-slate-100 min-h-screen">
-        <AppShell>{children}</AppShell>
+        <ClerkProviderWrapper>
+          <AppShell>{children}</AppShell>
+        </ClerkProviderWrapper>
       </body>
     </html>
   );
