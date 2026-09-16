@@ -16,7 +16,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const isLandingPage = pathname === '/';
-  const isAuthPage = pathname === '/login';
+  // /sso-callback runs mid-OAuth-flow before a session exists yet -- it
+  // must stay public, or useRequireAuth bounces the user to /login before
+  // the callback ever gets to call persistSession() and break Clerk login.
+  const isAuthPage = pathname === '/login' || pathname.startsWith('/sign-in') || pathname.startsWith('/sign-up') || pathname === '/sso-callback';
   const isProtected = !isLandingPage && !isAuthPage;
 
   const { isReady, isAdmin } = useRequireAuth(isProtected);

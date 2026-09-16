@@ -39,7 +39,7 @@ export function Navbar() {
     };
   }, []);
 
-  const isAdmin = session?.role === 'ROLE_ADMIN' || session?.role === 'ROLE_SUPERVISOR' || isSuperAdmin(session?.email, session?.username);
+  const isAdmin = session?.role === 'ROLE_ADMIN' || isSuperAdmin(session?.email, session?.username);
   const displayName = formatDisplayName(session);
 
   const handleLogout = () => {

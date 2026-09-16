@@ -28,6 +28,6 @@ export function useRequireAuth(enabled: boolean) {
   return {
     isReady: !enabled || ready,
     session,
-    isAdmin: session?.role === 'ROLE_ADMIN' || session?.role === 'ROLE_SUPERVISOR',
+    isAdmin: session?.role === 'ROLE_ADMIN',
   };
 }

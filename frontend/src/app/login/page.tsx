@@ -73,7 +73,7 @@ function LoginContent() {
   };
 
   const handleRouteAfterAuth = (session: AuthSession) => {
-    if (session.role === 'ROLE_ADMIN' || session.role === 'ROLE_SUPERVISOR' || isSuperAdmin(session.email, session.username)) {
+    if (session.role === 'ROLE_ADMIN' || isSuperAdmin(session.email, session.username)) {
       router.push('/dashboard');
     } else {
       router.push('/user');

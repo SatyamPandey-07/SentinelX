@@ -56,7 +56,7 @@ export function Sidebar() {
     return () => window.removeEventListener('sentinelx_auth_change', sync);
   }, []);
 
-  const isAdmin = session?.role === 'ROLE_ADMIN' || session?.role === 'ROLE_SUPERVISOR';
+  const isAdmin = session?.role === 'ROLE_ADMIN';
   const navItems = isAdmin ? ADMIN_NAV_ITEMS : USER_NAV_ITEMS;
 
   const handleLogout = () => {

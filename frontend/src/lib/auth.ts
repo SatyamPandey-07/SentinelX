@@ -1,4 +1,4 @@
-export type UserRole = 'ROLE_USER' | 'ROLE_ADMIN' | 'ROLE_SUPERVISOR' | 'ROLE_DISPATCHER';
+export type UserRole = 'ROLE_USER' | 'ROLE_ADMIN';
 
 export interface AuthSession {
   access_token: string;
