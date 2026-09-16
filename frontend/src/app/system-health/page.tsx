@@ -15,8 +15,8 @@ export default function SystemHealthPage() {
   const [loading, setLoading] = useState(true);
 
   const probeAll = useCallback(async () => {
-    const entries = Object.entries(SERVICE_PORTS);
-    const out = await Promise.all(entries.map(([name, port]) => probeServiceHealth(name, port)));
+    const names = Object.keys(SERVICE_PORTS);
+    const out = await Promise.all(names.map((name) => probeServiceHealth(name)));
     setResults(out);
     setLoading(false);
   }, []);

@@ -328,19 +328,19 @@ export function queryRag(query: string, incidentCategory?: string) {
 }
 
 // ---------------------------------------------------------------------
-// System health -- each service exposes its own actuator on its own
-// mapped host port; the browser hits them directly rather than through
-// the gateway (there's no gateway route for bare /actuator per service).
+// System health -- proxied server-side via /api/health-proxy/[service]
+// (a Next.js route handler) rather than fetched directly from the
+// browser: most backend services set no CORS headers on their own
+// actuator port (only auth-service does), so a direct browser fetch to
+// e.g. localhost:8082/actuator/health is blocked before it leaves the
+// browser. Server-to-server HTTP isn't subject to CORS.
 // ---------------------------------------------------------------------
 
-export async function probeServiceHealth(serviceName: string, port: number) {
-  const url = `http://localhost:${port}/actuator/health`;
+export async function probeServiceHealth(serviceName: string) {
   try {
-    const start = performance.now();
-    const res = await fetch(url, { cache: 'no-store' });
-    const latencyMs = Math.round(performance.now() - start);
-    const body = await res.json().catch(() => null);
-    return { service: serviceName, up: res.ok && body?.status === 'UP', latencyMs, raw: body };
+    const res = await fetch(`/api/health-proxy/${serviceName}`, { cache: 'no-store' });
+    const body = await res.json();
+    return { service: serviceName, up: !!body.up, latencyMs: body.latencyMs ?? null, raw: body.raw };
   } catch {
     return { service: serviceName, up: false, latencyMs: null, raw: null };
   }
