@@ -220,6 +220,7 @@ function LoginContent() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-[#060911]">
+      {clerkSignInBridge}
       {/* Tactical Glow Elements */}
       <div className="absolute inset-0 opacity-[0.25] bg-[radial-gradient(#38bdf8_1px,transparent_1px)] [background-size:26px_26px]" />
       <motion.div
