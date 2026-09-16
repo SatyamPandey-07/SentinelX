@@ -22,7 +22,7 @@ import {
   Crown,
   Info,
 } from 'lucide-react';
-import { authenticate, registerUser, persistSession, AuthSession, isSuperAdmin } from '@/lib/auth';
+import { authenticate, registerUser, persistSession, AuthSession, isSuperAdmin, SUPER_ADMINS } from '@/lib/auth';
 import { useSignIn } from '@clerk/nextjs';
 
 type ViewMode = 'signup' | 'signin';
@@ -159,16 +159,19 @@ function LoginContent() {
       let session: AuthSession;
 
       if (selectedRole === 'ADMIN') {
-        // Super Admin Afifa identity
+        // This is a simulated OAuth session (real Clerk auth didn't fire),
+        // so there's no real identity to resolve -- default to the first
+        // named Super Admin, same as the rest of the admin demo fallbacks.
+        const admin = SUPER_ADMINS[0];
         session = {
           access_token: `oauth-superadmin-${Date.now()}`,
           refresh_token: `oauth-refresh-${Date.now()}`,
-          username: 'Afifa',
+          username: admin.username,
           role: 'ROLE_ADMIN',
-          user_id: 'usr-superadmin-afifa',
-          first_name: 'Afifa',
-          last_name: 'Syed',
-          email: 'afifasyed06@gmail.com',
+          user_id: admin.userId,
+          first_name: admin.firstName,
+          last_name: admin.lastName,
+          email: admin.email,
         };
       } else {
         // Endless Campus User identity
