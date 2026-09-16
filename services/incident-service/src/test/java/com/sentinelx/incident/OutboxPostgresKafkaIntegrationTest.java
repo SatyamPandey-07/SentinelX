@@ -20,6 +20,7 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
@@ -53,20 +54,26 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *     topic -- a real consumer on the real broker receives it -- and flips
  *     the outbox row's status to PUBLISHED in the real DB afterward.
  *
- * Default: Testcontainers starts throwaway Postgres + Kafka containers.
+ * Default: Testcontainers starts throwaway Postgres + Kafka + Redis
+ * containers. Redis is required here too, not just for Postgres/Kafka --
+ * IncidentService.createIncident() reads/writes an idempotency-key cache
+ * entry via StringRedisTemplate on every call (see IncidentService.java),
+ * so without a real Redis this whole @SpringBootTest context fails with
+ * RedisConnectionFailureException the moment a test calls createIncident().
  * Override: -Dsentinelx.it.postgres.host/.port (+ optionally .admin-user/
- * .admin-password/.admin-db) and -Dsentinelx.it.kafka.bootstrap-servers
- * connect to an already-running docker-compose stack instead -- see
- * DistributedLockRedisIntegrationTest's class javadoc for why this
- * fallback exists on this particular host. When overriding, a fresh
- * `sentinelx_incident_test` database is created (if absent) on the
- * pointed-at Postgres so this test never touches the real dev database.
+ * .admin-password/.admin-db), -Dsentinelx.it.kafka.bootstrap-servers, and
+ * -Dsentinelx.it.redis.host/.port connect to an already-running
+ * docker-compose stack instead -- see DistributedLockRedisIntegrationTest's
+ * class javadoc for why this fallback exists on this particular host. When
+ * overriding Postgres, a fresh `sentinelx_incident_test` database is
+ * created (if absent) so this test never touches the real dev database.
  */
 @SpringBootTest
 class OutboxPostgresKafkaIntegrationTest {
 
     private static PostgreSQLContainer<?> ownedPostgres;
     private static KafkaContainer ownedKafka;
+    private static GenericContainer<?> ownedRedis;
 
     @DynamicPropertySource
     static void registerProperties(DynamicPropertyRegistry registry) {
@@ -99,6 +106,18 @@ class OutboxPostgresKafkaIntegrationTest {
             ownedKafka = new KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.6.0"));
             ownedKafka.start();
             registry.add("spring.kafka.bootstrap-servers", ownedKafka::getBootstrapServers);
+        }
+
+        String redisHost = System.getProperty("sentinelx.it.redis.host");
+        if (redisHost != null) {
+            int redisPort = Integer.parseInt(System.getProperty("sentinelx.it.redis.port", "6379"));
+            registry.add("spring.data.redis.host", () -> redisHost);
+            registry.add("spring.data.redis.port", () -> redisPort);
+        } else {
+            ownedRedis = new GenericContainer<>(DockerImageName.parse("redis:7.2-alpine")).withExposedPorts(6379);
+            ownedRedis.start();
+            registry.add("spring.data.redis.host", ownedRedis::getHost);
+            registry.add("spring.data.redis.port", () -> ownedRedis.getMappedPort(6379));
         }
 
         // Real HTTP calls to ai-service/search-service (neither is running
