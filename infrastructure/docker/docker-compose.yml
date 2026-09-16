@@ -131,7 +131,16 @@ services:
       - sentinelx-net
 
   opensearch-dashboards:
-    image: opensearchproject/opensearch-dashboards:2.12.0
+    # 2.12.0 (matching the opensearch server's own version) has a genuine
+    # startup bug on this environment: its entrypoint execs into the actual
+    # dashboards binary, which then exits silently (no log output, exit
+    # code 0) within ~1s on this Docker Desktop/WSL2 setup, restart-looping
+    # forever. 2.19.1 starts and serves normally against the 2.12.0 server
+    # (a newer-minor dashboards against an older-minor server is within
+    # OpenSearch's supported compatibility window) — a version mismatch
+    # banner is a fully acceptable tradeoff for a UI-only convenience that
+    # nothing else in the system depends on.
+    image: opensearchproject/opensearch-dashboards:2.19.1
     container_name: sentinelx-opensearch-dashboards
     restart: unless-stopped
     ports:
