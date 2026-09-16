@@ -27,7 +27,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (isLandingPage) {
     return (
       <SmoothScrollProvider>
-        <div className="w-full min-h-screen bg-[#060911] text-slate-100 flex flex-col selection:bg-cyan-500/20 selection:text-cyan-300">
+        {/* No opaque background here -- LandingScene3D is a fixed, -z-10
+            canvas rendered inside the page itself, and an opaque bg on this
+            wrapper would paint over it. */}
+        <div className="w-full min-h-screen text-slate-100 flex flex-col selection:bg-cyan-500/20 selection:text-cyan-300">
           {children}
         </div>
       </SmoothScrollProvider>
