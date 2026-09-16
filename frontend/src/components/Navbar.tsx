@@ -6,16 +6,13 @@ import { useRouter } from 'next/navigation';
 import {
   Shield,
   Radio,
-  Activity,
-  Bell,
-  User,
   Clock,
-  Repeat,
+  User,
   LogOut,
-  ShieldCheck,
   ShieldAlert,
+  ChevronRight,
 } from 'lucide-react';
-import { getSession, switchRole, clearSession, AuthSession } from '@/lib/auth';
+import { getSession, clearSession, AuthSession } from '@/lib/auth';
 
 export function Navbar() {
   const router = useRouter();
@@ -42,19 +39,6 @@ export function Navbar() {
 
   const isAdmin = session?.role === 'ROLE_ADMIN' || session?.role === 'ROLE_SUPERVISOR';
 
-  const handleToggleMode = () => {
-    const newRole = isAdmin ? 'ROLE_USER' : 'ROLE_ADMIN';
-    const updated = switchRole(newRole);
-    if (updated) {
-      setSession(updated);
-      if (newRole === 'ROLE_ADMIN') {
-        router.push('/dashboard');
-      } else {
-        router.push('/user');
-      }
-    }
-  };
-
   const handleLogout = () => {
     clearSession();
     router.push('/login?mode=signup');
@@ -62,7 +46,7 @@ export function Navbar() {
 
   return (
     <header className="h-16 border-b border-white/[0.08] bg-[#080A0F]/90 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between sticky top-0 z-50">
-      {/* Brand & Operational Readiness */}
+      {/* Brand & Mode Display */}
       <div className="flex items-center gap-4">
         <Link href={isAdmin ? '/dashboard' : '/user'} className="flex items-center gap-3 group">
           <div className={`w-9 h-9 rounded-lg border flex items-center justify-center transition-colors ${
@@ -98,46 +82,42 @@ export function Navbar() {
           <span>BACKBONE: <strong className="text-emerald-400">ONLINE</strong></span>
         </div>
 
-        {/* 1-Click Mode Switcher Button */}
-        <button
-          onClick={handleToggleMode}
-          id="btn-switch-mode"
-          title="Click to toggle between Admin Mode and User Mode"
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all border shadow-sm ${
-            isAdmin
-              ? 'bg-cyan-950/40 hover:bg-cyan-900/60 border-cyan-500/40 text-cyan-300 hover:border-cyan-400'
-              : 'bg-red-950/40 hover:bg-red-900/60 border-red-500/40 text-red-300 hover:border-red-400'
-          }`}
-        >
-          <Repeat className="w-3.5 h-3.5" />
-          <span>SWITCH TO {isAdmin ? 'USER MODE' : 'ADMIN MODE'}</span>
-        </button>
+        <div className="flex items-center gap-2 text-slate-300 bg-black/40 px-3 py-1.5 rounded-lg border border-white/[0.06]">
+          <span>STATUS: <strong className={isAdmin ? 'text-red-400' : 'text-cyan-400'}>{isAdmin ? 'DISPATCH LEVEL 4' : 'REPORTER ONLINE'}</strong></span>
+        </div>
       </div>
 
-      {/* Clock, Profile & Logout */}
+      {/* Clock, Profile Link & Logout */}
       <div className="flex items-center gap-3 sm:gap-4">
         <div className="hidden md:flex items-center gap-2 font-mono text-xs text-slate-300 bg-slate-900/80 px-3 py-1.5 rounded-lg border border-white/[0.08]">
           <Clock className="w-3.5 h-3.5 text-cyan-400" />
           <span>{time || '00:00:00 UTC'}</span>
         </div>
 
-        <div className="flex items-center gap-2.5 pl-2 border-l border-white/[0.08]">
-          <div className={`w-8 h-8 rounded-full border flex items-center justify-center ${
+        {/* Clickable Profile Card -> opens /profile */}
+        <Link
+          href="/profile"
+          id="nav-profile-btn"
+          title="Click to view and manage your profile"
+          className="flex items-center gap-2.5 pl-2 border-l border-white/[0.08] hover:opacity-90 group transition-all"
+        >
+          <div className={`w-8 h-8 rounded-full border flex items-center justify-center transition-all ${
             isAdmin
-              ? 'bg-red-600/20 border-red-500/40 text-red-400'
-              : 'bg-cyan-600/20 border-cyan-500/40 text-cyan-400'
+              ? 'bg-red-600/20 border-red-500/40 text-red-400 group-hover:border-red-400 group-hover:bg-red-600/30'
+              : 'bg-cyan-600/20 border-cyan-500/40 text-cyan-400 group-hover:border-cyan-400 group-hover:bg-cyan-600/30'
           }`}>
             {isAdmin ? <ShieldAlert className="w-4 h-4" /> : <User className="w-4 h-4" />}
           </div>
           <div className="hidden sm:block text-left">
-            <div className="text-xs font-bold text-slate-200 font-mono">
-              {session?.username ?? (isAdmin ? 'admin' : 'campus_user')}
+            <div className="text-xs font-bold text-slate-200 font-mono group-hover:text-cyan-300 flex items-center gap-1 transition-colors">
+              <span>{session?.username ?? (isAdmin ? 'admin' : 'campus_user')}</span>
+              <ChevronRight className="w-3 h-3 text-slate-500 group-hover:text-cyan-400 transition-transform group-hover:translate-x-0.5" />
             </div>
             <div className={`text-[10px] font-mono font-bold ${isAdmin ? 'text-red-400' : 'text-cyan-400'}`}>
               {session?.role ?? (isAdmin ? 'ROLE_ADMIN' : 'ROLE_USER')}
             </div>
           </div>
-        </div>
+        </Link>
 
         <button
           onClick={handleLogout}

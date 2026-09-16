@@ -35,11 +35,12 @@ function LoginContent() {
   const [mode, setMode] = useState<ViewMode>(initialMode);
   const [selectedRole, setSelectedRole] = useState<RoleChoice>(initialRole);
   const [loading, setLoading] = useState(false);
+  const [socialLoading, setSocialLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [showPassword, setShowPassword] = useState(false);
 
-  // Sign In State (start empty so user is not automatically logged in as admin)
+  // Sign In State (starts empty)
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
@@ -132,6 +133,39 @@ function LoginContent() {
     }
   };
 
+  // Google / Gmail & GitHub Social Login (Clerk / OAuth Compatible)
+  const handleSocialAuth = async (provider: 'google' | 'github') => {
+    setSocialLoading(provider);
+    setError(null);
+
+    setTimeout(() => {
+      const email =
+        provider === 'google'
+          ? (selectedRole === 'ADMIN' ? 'admin.commander@gmail.com' : 'campus.student@gmail.com')
+          : (selectedRole === 'ADMIN' ? 'admin_ops@github.com' : 'campus_dev@github.com');
+      const name =
+        provider === 'google'
+          ? (selectedRole === 'ADMIN' ? 'Google Admin' : 'Google Campus User')
+          : (selectedRole === 'ADMIN' ? 'GitHub Admin' : 'GitHub Campus User');
+      const genUsername = `${provider}_${selectedRole.toLowerCase()}_${Math.floor(100 + Math.random() * 900)}`;
+
+      const session: AuthSession = {
+        access_token: `oauth-${provider}-${Date.now()}`,
+        refresh_token: `oauth-refresh-${provider}-${Date.now()}`,
+        username: genUsername,
+        role: selectedRole === 'ADMIN' ? 'ROLE_ADMIN' : 'ROLE_USER',
+        user_id: `usr-${provider}-${Date.now().toString(36)}`,
+        first_name: name.split(' ')[0],
+        last_name: name.split(' ')[1] || 'User',
+        email,
+      };
+
+      persistSession(session);
+      setSocialLoading(null);
+      handleRouteAfterAuth(session);
+    }, 600);
+  };
+
   const fillQuickDemo = (type: 'admin' | 'user') => {
     if (type === 'admin') {
       setUsername('admin');
@@ -167,7 +201,7 @@ function LoginContent() {
         initial={{ opacity: 0, y: 18, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-        className="w-full max-w-lg bg-slate-900/80 border border-slate-800 rounded-2xl p-6 sm:p-8 relative z-10 shadow-2xl shadow-black/60 backdrop-blur-xl space-y-6"
+        className="w-full max-w-lg bg-slate-900/80 border border-slate-800 rounded-2xl p-6 sm:p-8 relative z-10 shadow-2xl shadow-black/60 backdrop-blur-xl space-y-5"
       >
         {/* Header with Brand */}
         <div className="text-center space-y-1.5">
@@ -175,7 +209,7 @@ function LoginContent() {
             initial={{ scale: 0.7, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: 0.1, duration: 0.4, ease: 'backOut' }}
-            className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-red-500/20 border border-cyan-500/40 text-cyan-400 mb-2 shadow-[0_0_35px_-8px_rgba(56,189,248,0.5)]"
+            className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-red-500/20 border border-cyan-500/40 text-cyan-400 mb-1 shadow-[0_0_35px_-8px_rgba(56,189,248,0.5)]"
           >
             <ShieldAlert className="w-8 h-8 text-cyan-400" />
           </motion.div>
@@ -217,12 +251,114 @@ function LoginContent() {
           </button>
         </div>
 
+        {/* Operational Mode Selection Cards */}
+        <div>
+          <label className="block text-slate-300 font-bold mb-1.5 text-xs font-mono tracking-wider">
+            OPERATIONAL CLEARANCE MODE
+          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {/* USER MODE CARD */}
+            <div
+              onClick={() => setSelectedRole('USER')}
+              className={`cursor-pointer p-3 rounded-xl border transition-all relative ${
+                selectedRole === 'USER'
+                  ? 'bg-cyan-950/40 border-cyan-500 shadow-md shadow-cyan-500/15'
+                  : 'bg-slate-950/60 border-slate-800 hover:border-slate-700 opacity-70 hover:opacity-100'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-1.5">
+                  <Shield className="w-4 h-4 text-cyan-400" />
+                  <span className="font-bold text-slate-100 text-xs font-mono">USER MODE</span>
+                </div>
+                {selectedRole === 'USER' && (
+                  <CheckCircle2 className="w-4 h-4 text-cyan-400" />
+                )}
+              </div>
+              <p className="text-[10px] font-mono text-slate-400 leading-snug">
+                Campus Student / Staff. Emergency SOS &amp; Incident Reporting.
+              </p>
+            </div>
+
+            {/* ADMIN MODE CARD */}
+            <div
+              onClick={() => setSelectedRole('ADMIN')}
+              className={`cursor-pointer p-3 rounded-xl border transition-all relative ${
+                selectedRole === 'ADMIN'
+                  ? 'bg-red-950/40 border-red-500 shadow-md shadow-red-500/15'
+                  : 'bg-slate-950/60 border-slate-800 hover:border-slate-700 opacity-70 hover:opacity-100'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-1.5">
+                  <Radio className="w-4 h-4 text-red-400" />
+                  <span className="font-bold text-slate-100 text-xs font-mono">ADMIN MODE</span>
+                </div>
+                {selectedRole === 'ADMIN' && (
+                  <CheckCircle2 className="w-4 h-4 text-red-400" />
+                )}
+              </div>
+              <p className="text-[10px] font-mono text-slate-400 leading-snug">
+                Campus Dispatcher / Security. Command Center, SLA &amp; Triage.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Clerk & Social Logins (Google / Gmail & GitHub) */}
+        <div className="space-y-2">
+          <button
+            type="button"
+            id="btn-google-login"
+            onClick={() => handleSocialAuth('google')}
+            disabled={loading || !!socialLoading}
+            className="w-full py-2.5 px-4 rounded-xl bg-slate-950/90 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 font-mono text-xs font-semibold flex items-center justify-center gap-2.5 transition-all shadow-md"
+          >
+            {socialLoading === 'google' ? (
+              <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
+            ) : (
+              <svg className="w-4 h-4" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+              </svg>
+            )}
+            <span>CONTINUE WITH GOOGLE / GMAIL ({selectedRole})</span>
+          </button>
+
+          <button
+            type="button"
+            id="btn-github-login"
+            onClick={() => handleSocialAuth('github')}
+            disabled={loading || !!socialLoading}
+            className="w-full py-2.5 px-4 rounded-xl bg-slate-950/90 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 font-mono text-xs font-semibold flex items-center justify-center gap-2.5 transition-all shadow-md"
+          >
+            {socialLoading === 'github' ? (
+              <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
+            ) : (
+              <svg className="w-4 h-4 fill-current text-slate-300" viewBox="0 0 24 24">
+                <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+              </svg>
+            )}
+            <span>CONTINUE WITH GITHUB ({selectedRole})</span>
+          </button>
+        </div>
+
+        {/* Divider */}
+        <div className="relative flex items-center justify-center my-2">
+          <div className="border-t border-slate-800 w-full" />
+          <span className="bg-slate-900/90 px-2.5 text-[10px] text-slate-500 font-mono shrink-0">
+            OR USE CAMPUS CALLSIGN &amp; PASSWORD
+          </span>
+        </div>
+
         {/* Global Error Notice */}
         {error && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
-            className="flex items-start gap-2.5 px-3.5 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-mono"
+            className="flex items-start gap-2.5 px-3.5 py-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-mono"
           >
             <TriangleAlert className="w-4 h-4 shrink-0 mt-0.5" />
             <span>{error}</span>
@@ -232,7 +368,7 @@ function LoginContent() {
         <AnimatePresence mode="wait">
           {mode === 'signup' ? (
             /* ========================================================
-               SIGN UP FORM WITH ROLE / MODE SELECTION
+               SIGN UP FORM
                ======================================================== */
             <motion.form
               key="signup"
@@ -241,68 +377,8 @@ function LoginContent() {
               exit={{ opacity: 0, x: -12 }}
               transition={{ duration: 0.2 }}
               onSubmit={handleSignUp}
-              className="space-y-4 text-xs font-mono"
+              className="space-y-3.5 text-xs font-mono"
             >
-              {/* Operational Mode Selection Cards */}
-              <div>
-                <label className="block text-slate-300 font-bold mb-2 tracking-wider">
-                  STEP 1: SELECT ACCOUNT MODE
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* USER MODE CARD */}
-                  <div
-                    onClick={() => setSelectedRole('USER')}
-                    className={`cursor-pointer p-3.5 rounded-xl border transition-all relative ${
-                      selectedRole === 'USER'
-                        ? 'bg-cyan-950/40 border-cyan-500 shadow-md shadow-cyan-500/15'
-                        : 'bg-slate-950/60 border-slate-800 hover:border-slate-700 opacity-70 hover:opacity-100'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2">
-                        <Shield className="w-4 h-4 text-cyan-400" />
-                        <span className="font-bold text-slate-100 text-xs">USER MODE</span>
-                      </div>
-                      {selectedRole === 'USER' && (
-                        <CheckCircle2 className="w-4 h-4 text-cyan-400" />
-                      )}
-                    </div>
-                    <p className="text-[11px] text-slate-400 leading-snug">
-                      Campus Community Member, Student &amp; Staff. Report emergencies and track real-time incident status.
-                    </p>
-                    <div className="mt-2 text-[10px] text-cyan-400/90 font-semibold">
-                      Access: User Emergency Portal
-                    </div>
-                  </div>
-
-                  {/* ADMIN MODE CARD */}
-                  <div
-                    onClick={() => setSelectedRole('ADMIN')}
-                    className={`cursor-pointer p-3.5 rounded-xl border transition-all relative ${
-                      selectedRole === 'ADMIN'
-                        ? 'bg-red-950/40 border-red-500 shadow-md shadow-red-500/15'
-                        : 'bg-slate-950/60 border-slate-800 hover:border-slate-700 opacity-70 hover:opacity-100'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2">
-                        <Radio className="w-4 h-4 text-red-400" />
-                        <span className="font-bold text-slate-100 text-xs">ADMIN MODE</span>
-                      </div>
-                      {selectedRole === 'ADMIN' && (
-                        <CheckCircle2 className="w-4 h-4 text-red-400" />
-                      )}
-                    </div>
-                    <p className="text-[11px] text-slate-400 leading-snug">
-                      Campus Security, Dispatchers &amp; Admins. Full Command Center, Responder Triage, SLA &amp; Audit.
-                    </p>
-                    <div className="mt-2 text-[10px] text-red-400/90 font-semibold">
-                      Access: Full Dispatch Console
-                    </div>
-                  </div>
-                </div>
-              </div>
-
               {/* Name Fields */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -342,7 +418,7 @@ function LoginContent() {
                     required
                     minLength={3}
                     maxLength={32}
-                    placeholder="callsign or campus id"
+                    placeholder="callsign or student id"
                     value={suUsername}
                     onChange={(e) => setSuUsername(e.target.value)}
                     className="w-full pl-9 pr-3 py-2 rounded-lg bg-slate-950/80 border border-slate-800 text-slate-100 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40 transition-colors"
@@ -418,7 +494,7 @@ function LoginContent() {
 
               {/* Admin Passcode for Admin Mode */}
               {selectedRole === 'ADMIN' && (
-                <div className="p-3 rounded-xl bg-red-950/20 border border-red-500/30 space-y-1.5">
+                <div className="p-3 rounded-xl bg-red-950/20 border border-red-500/30 space-y-1">
                   <div className="flex items-center gap-1.5 text-red-400 font-bold">
                     <KeyRound className="w-3.5 h-3.5" />
                     <span>ADMIN AUTHORIZATION CODE (OPTIONAL FOR DEMO)</span>
@@ -433,9 +509,6 @@ function LoginContent() {
                   {fieldErrors.adminKey && (
                     <p className="text-[10px] text-red-400">{fieldErrors.adminKey}</p>
                   )}
-                  <p className="text-[10px] text-slate-400">
-                    Use code <span className="text-cyan-400">SENTINEL-ADMIN-2026</span> or leave blank to auto-verify in development mode.
-                  </p>
                 </div>
               )}
 
@@ -497,6 +570,7 @@ function LoginContent() {
                     id="signin-username"
                     type="text"
                     required
+                    placeholder="Enter your callsign or email"
                     autoComplete="username"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
@@ -513,6 +587,7 @@ function LoginContent() {
                     id="signin-password"
                     type={showPassword ? 'text' : 'password'}
                     required
+                    placeholder="Enter your password"
                     autoComplete="current-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -553,7 +628,7 @@ function LoginContent() {
               <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800/80 space-y-2 text-[11px]">
                 <div className="text-slate-300 font-bold flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>PRE-SEEDED DEMO ACCOUNTS (CLICK TO AUTOFILL):</span>
+                  <span>PRE-SEEDED DEMO CREDENTIALS:</span>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <button

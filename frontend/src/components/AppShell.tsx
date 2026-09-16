@@ -10,7 +10,7 @@ import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { ShieldAlert, ArrowRight, Lock } from 'lucide-react';
 import { switchRole } from '@/lib/auth';
 
-const ADMIN_ONLY_ROUTES = ['/system-health', '/audit', '/sla'];
+const ADMIN_ONLY_ROUTES = ['/dashboard', '/incidents', '/responders', '/sla', '/analytics', '/intelligence', '/system-health', '/audit', '/settings'];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -61,26 +61,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           />
 
           {isRestrictedForUser ? (
-            <div className="max-w-2xl mx-auto my-12 p-8 rounded-2xl bg-slate-900/80 border border-red-500/30 backdrop-blur-xl text-center space-y-4">
+            <div className="max-w-2xl mx-auto my-12 p-8 rounded-2xl bg-slate-900/80 border border-red-500/30 backdrop-blur-xl text-center space-y-4 shadow-2xl">
               <div className="w-14 h-14 mx-auto rounded-2xl bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-400">
                 <Lock className="w-7 h-7" />
               </div>
               <h2 className="text-xl font-bold font-mono text-white">
-                ADMINISTRATIVE CLEARANCE REQUIRED
+                ADMINISTRATIVE DISPATCH CLEARANCE REQUIRED
               </h2>
               <p className="text-xs font-mono text-slate-400 leading-relaxed max-w-md mx-auto">
-                You are currently in <strong className="text-cyan-400">USER MODE</strong> (Campus Reporter). This module ({pathname}) requires <strong className="text-red-400">ROLE_ADMIN</strong> clearance to inspect cluster infrastructure and cryptographic ledgers.
+                You are currently signed in as a <strong className="text-cyan-400">Campus Reporter (USER MODE)</strong>. Access to this command console ({pathname}) requires authenticating with an <strong className="text-red-400">Administrator account</strong>.
               </p>
-              <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+              <div className="pt-3 flex flex-wrap items-center justify-center gap-3">
                 <button
-                  onClick={() => {
-                    switchRole('ROLE_ADMIN');
-                    router.refresh();
-                  }}
+                  onClick={() => router.push('/login?mode=signin&role=admin')}
                   className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-mono text-xs font-bold tracking-wider flex items-center gap-2 shadow-lg shadow-red-600/30 transition-all"
                 >
                   <ShieldAlert className="w-4 h-4" />
-                  <span>UPGRADE TO ADMIN CLEARANCE</span>
+                  <span>SIGN IN WITH ADMIN ACCOUNT</span>
                 </button>
                 <button
                   onClick={() => router.push('/user')}
