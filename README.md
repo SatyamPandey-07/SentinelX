@@ -8,6 +8,7 @@
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-PostGIS-blue)
 ![OpenSearch](https://img.shields.io/badge/OpenSearch-2.x-teal)
 ![Python](https://img.shields.io/badge/Python-FastAPI-yellow)
+![Go](https://img.shields.io/badge/Go-Healthcheck%20CLI-00ADD8)
 ![Next.js](https://img.shields.io/badge/Frontend-Next.js%2014-black)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
@@ -72,6 +73,7 @@ SentinelX adopts a **Database-Per-Service** microservices architecture connected
 | **Audit Service**| Spring Boot, SHA-256 | 8090 | Append-only cryptographically hash-chained audit ledger | PostgreSQL (`sentinelx_audit`) |
 | **AI Service**| Python 3.10+, FastAPI | 8000 | Deterministic safety guardrails, ML/LLM classification, Qdrant RAG assistant | Qdrant Vector DB |
 | **Web Frontend**| Next.js 14, Tailwind CSS | 3000 | Responsive dispatcher operations portal, campus map, live SLA feeds | Browser Client |
+| **Healthcheck CLI**| Go (stdlib only) | — | `tools/healthcheck`: pings every service/dashboard endpoint and prints a pass/fail report | n/a |
 
 ---
 
@@ -104,22 +106,26 @@ SentinelX adopts a **Database-Per-Service** microservices architecture connected
 - Node.js 18+ (for local frontend development)
 - Python 3.10+ (for local AI development)
 
+> **New here and not a developer?** [docs/RUNBOOK.md](docs/RUNBOOK.md) walks through every step below in plain language, with no assumed background — start there instead.
+
 ### Step 1: Start Core Infrastructure
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/sentinelx.git
-cd sentinelx
+git clone https://github.com/SatyamPandey-07/SentinelX.git
+cd SentinelX
 
 # Launch all infrastructure (PostgreSQL, Redis, Kafka, OpenSearch, Qdrant, Prometheus, Grafana, Jaeger)
 make dev
-# Alternatively: docker compose -f infrastructure/docker/docker-compose.yml up -d
+# Alternatively: docker compose --env-file .env -f infrastructure/docker/docker-compose.yml up -d
 ```
 
+On a resource-constrained machine, starting all 23 containers at once can overload Docker Desktop's own engine. If that happens, start the core path and dashboards first, then bring up the remaining background services one at a time — see [docs/RUNBOOK.md](docs/RUNBOOK.md#known-issues).
+
 ### Step 2: Access Infrastructure Consoles
-- **Kafka-UI**: `http://localhost:8080` (or `http://localhost:8085` depending on port bindings)
+- **Kafka-UI**: `http://localhost:8095`
 - **OpenSearch Dashboards**: `http://localhost:5601`
 - **Prometheus UI**: `http://localhost:9090`
-- **Grafana Dashboards**: `http://localhost:3000` (User: `admin` / Pass: `admin`)
+- **Grafana Dashboards**: `http://localhost:3001` (User: `admin` / Pass: `admin`)
 - **Jaeger Tracing**: `http://localhost:16686`
 - **MailHog Inbox**: `http://localhost:8025`
 
@@ -132,8 +138,15 @@ mvn clean package -DskipTests
 cd frontend
 npm install
 npm run dev
-# Accessible at http://localhost:3000
+# Accessible at http://localhost:3000 -- sign in with admin/Admin@12345, or use the Sign Up tab to create your own account
 ```
+
+### Step 4 (optional): Check everything is actually up
+```bash
+cd tools/healthcheck
+go run .
+```
+A small Go CLI that pings every service and dashboard endpoint and prints a pass/fail report, instead of opening a dozen browser tabs to find out what's down.
 
 ---
 
@@ -160,6 +173,7 @@ k6 run tests/load/incident_creation_load.js
 
 | Document | Description |
 |---|---|
+| [docs/RUNBOOK.md](docs/RUNBOOK.md) | Plain-language, zero-assumed-background guide to installing, running, and clicking through every feature and dashboard |
 | [docs/ARCHITECTURE.md](file:///d:/VIGIL/docs/ARCHITECTURE.md) | 12 complete Mermaid diagrams detailing workflows, data flows, and lifecycles |
 | [docs/DISTRIBUTED_SYSTEMS.md](file:///d:/VIGIL/docs/DISTRIBUTED_SYSTEMS.md) | In-depth breakdown of Transactional Outbox, Sagas, Distributed Locks, and CQRS |
 | [docs/CAP_THEOREM.md](file:///d:/VIGIL/docs/CAP_THEOREM.md) | Rigorous analysis of CAP theorem trade-offs across SentinelX services |

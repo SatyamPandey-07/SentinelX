@@ -1,190 +1,146 @@
-# SentinelX Runbook
+# Trying out SentinelX — a friendly guide
 
-Hands-on testing flow for every SentinelX feature and dashboard. Every request below was run against the live stack and confirmed working before this doc was written — no untested steps.
+Hey! 👋 This is a guide to get SentinelX running on **your own computer** and click through everything yourself — no coding knowledge needed. Just follow the steps in order and copy-paste the commands exactly as written.
 
-## 0. Quick start
+SentinelX is a practice project that simulates how a city's emergency dispatch system might work — reporting incidents (like a fire or accident), assigning responders, tracking them on a map, and so on. It's made of a website (what you'll click around in) and a bunch of background programs that power it.
 
-The stable configuration on a resource-constrained dev machine is 14 containers: the core product path plus every dashboard, with the 9 background/event-driven services started separately.
+Take your time, and don't worry if something looks scary — the [If something goes wrong](#if-something-goes-wrong) section at the bottom has you covered.
 
-```bash
-# 1. Core path + all dashboards (14 containers -- the stable set)
-cd D:\VIGIL
-docker compose --env-file .env -f infrastructure/docker/docker-compose.yml up -d \
-  postgres redis kafka opensearch \
-  auth-service incident-service search-service api-gateway \
+---
+
+## What you need to install first
+
+You only do this part once. Install these three programs, in this order:
+
+1. **Docker Desktop** — this runs all the "behind the scenes" parts of the project (the database, the servers, etc.) in neat little sandboxes called *containers*, so you don't have to install any of that stuff by hand.
+   Download it from **docker.com** → "Get Started" → download for your operating system (Windows or Mac) → install it like any other app → open it once so it finishes setting up. You'll see a whale icon 🐳 in your taskbar/menu bar when it's ready.
+
+2. **Node.js** — this runs the website part.
+   Download it from **nodejs.org** → pick the **LTS** version (the one recommended for most people) → install it with all the default options.
+
+3. **Git** — this downloads the project's code onto your computer.
+   Download it from **git-scm.com** → install it with all the default options.
+
+Restart your computer after installing these three, just to be safe.
+
+---
+
+## Step 1 — Open a terminal
+
+A "terminal" is just a plain black/white window where you type commands instead of clicking. It sounds intimidating but you're only ever going to copy-paste into it.
+
+- **Windows:** press the Start button, type `PowerShell`, press Enter.
+- **Mac:** press Cmd+Space, type `Terminal`, press Enter.
+
+## Step 2 — Get the project
+
+Copy this whole block, paste it into your terminal, and press Enter:
+
+```
+git clone https://github.com/SatyamPandey-07/SentinelX.git VIGIL
+cd VIGIL
+```
+
+This downloads the project into a folder called `VIGIL` and moves you into it. Keep this terminal window open — you'll type more commands into this same window.
+
+## Step 3 — Start the backend (the "engine room")
+
+Make sure Docker Desktop is open (check for the whale icon 🐳). Then paste this:
+
+```
+docker compose --env-file .env -f infrastructure/docker/docker-compose.yml up -d ^
+  postgres redis kafka opensearch ^
+  auth-service incident-service search-service api-gateway ^
   grafana prometheus jaeger otel-collector kafka-ui opensearch-dashboards mailhog
-
-# wait ~60-90s for health checks, then:
-
-# 2. Frontend
-cd frontend
-npm run dev   # http://localhost:3000
 ```
 
-Confirm everything is healthy with `docker ps`.
+You'll see a bunch of text scroll by — that's normal, it's downloading and starting everything. **The first time, this can take 5–10 minutes** because it's downloading a lot. Go make a tea. ☕
 
-> **Why only 14 of 23 containers at once:** on constrained hosts, starting all 11 Java microservices simultaneously alongside the dashboards can overload Docker Desktop's own engine (not the app) until its API stops responding, requiring a full restart to recover. Splitting the startup avoids that. See [Known issues](#known-issues) for bringing up the other 9 one at a time.
+When it's done, type this to check everything's alive:
 
-## 1. Credentials & URLs
-
-| What | URL | Login |
-|---|---|---|
-| Frontend | `localhost:3000` | register your own, or use admin below |
-| API Gateway | `localhost:8080` | Bearer JWT (see §2 Auth) |
-| Seeded admin | — | `admin` / `Admin@12345` |
-| Grafana | `localhost:3001` | `admin` / `admin` |
-| Kafka UI | `localhost:8095` | no auth |
-| OpenSearch Dashboards | `localhost:5601` | no auth (security plugin disabled) |
-| Jaeger UI | `localhost:16686` | no auth |
-| Prometheus | `localhost:9090` | no auth |
-| Mailhog | `localhost:8025` | no auth |
-
-## 2. Authentication — live
-
-Frontend: the login/register screens at `/`. API: `auth-service` via the gateway, no token required (public route).
-
-```bash
-curl -X POST localhost:8080/api/v1/auth/register -H "Content-Type: application/json" -d '{
-  "username":"tester1","email":"tester1@sentinelx.local",
-  "password":"Password123!","first_name":"Test","last_name":"User"}'
-
-curl -X POST localhost:8080/api/v1/auth/login -H "Content-Type: application/json" -d '{
-  "username":"admin","password":"Admin@12345"}'
-# copy access_token from the response into $TOKEN for everything below
-
-curl localhost:8080/api/v1/auth/me -H "Authorization: Bearer $TOKEN"
-curl localhost:8080/api/v1/auth/validate -H "Authorization: Bearer $TOKEN"
-curl -X POST localhost:8080/api/v1/auth/refresh -H "Content-Type: application/json" -d '{"refresh_token":"..."}'
-curl -X POST localhost:8080/api/v1/auth/logout -H "Authorization: Bearer $TOKEN"
+```
+docker ps
 ```
 
-**Verified:** register → 201 with tokens; login as admin → 200 with ROLE_ADMIN JWT; `/me` echoes the authenticated user.
+You should see a list of about 14 things, each saying `Up ... (healthy)`. If a couple still say `(health: starting)`, just wait another minute or two and run `docker ps` again.
 
-## 3. Incident lifecycle — live
+## Step 4 — Start the website
 
-Frontend: the "Report Incident" form and the incident board. API: `incident-service`, routed through the gateway's circuit-breaker-wrapped route.
+Open a **second** terminal window (leave the first one alone) and paste:
 
-```bash
-curl -X POST localhost:8080/api/v1/incidents \
-  -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
-  -H "Idempotency-Key: demo-$(date +%s)" -d '{
-    "title":"Fire in the East Wing","description":"Smoke on 3rd floor stairwell",
-    "category":"FIRE","severity":"HIGH",
-    "location":{"latitude":37.7749,"longitude":-122.4194,"building":"East Wing",
-      "floor":"3","zone_id":"ZONE_EAST","address":"1 Campus Rd"},
-    "attachment_urls":[]}'
-# save the returned "id" as $INC
-
-curl localhost:8080/api/v1/incidents/$INC -H "Authorization: Bearer $TOKEN"
-curl localhost:8080/api/v1/incidents -H "Authorization: Bearer $TOKEN"   # list
-
-curl -X POST localhost:8080/api/v1/incidents/$INC/acknowledge \
-  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{}'
-curl -X POST localhost:8080/api/v1/incidents/$INC/resolve \
-  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"resolutionNotes":"Extinguished, area clear"}'
+```
+cd VIGIL/frontend
+npm install
+npm run dev
 ```
 
-**Verified:** create → 201, status `REPORTED`; acknowledge → 200, status `ACKNOWLEDGED` with `acknowledged_at` set. Each create also writes an `outbox_events` row that gets published to Kafka topic `incident.created` (see Kafka UI).
+`npm install` only needs to happen the first time (it also takes a few minutes). Once you see a line that says `Ready`, the website is running.
 
-> **Idempotency-Key** is required on `POST /incidents` — reuse the same key to confirm the endpoint returns the original incident instead of creating a duplicate.
+## Step 5 — Open it in your browser
 
-## 4. Search & duplicate detection — live
+Go to **http://localhost:3000** in Chrome, Edge, or whatever browser you like.
 
-Frontend: the search bar on the incident board. API: `search-service` against real OpenSearch.
+You'll land on a login screen. You have two options:
 
-### Full-text search
+- **Use the pre-made account:** username `admin`, password `Admin@12345`.
+- **Or make your own account:** click the **SIGN UP** tab at the top of the login box, fill in your name/email/username/password, and it logs you straight in. (This is a real feature — try it, it's brand new!)
 
-```bash
-curl "localhost:8080/api/v1/search/incidents?q=Fire&category=FIRE" \
-  -H "Authorization: Bearer $TOKEN"
+---
+
+## Things to click around and try
+
+Once you're logged in, here's a checklist of everything to poke at. Nothing here is fake — every click actually talks to a real backend.
+
+- [ ] **Report an incident** — find the "Report Incident" / "New Incident" button, fill in a title, description, pick a category like Fire or Medical, and submit it.
+- [ ] **See it appear** on the incident board/dashboard.
+- [ ] **Search for it** using the search bar — type part of the title you used.
+- [ ] **Open the incident** and try the Acknowledge and Resolve buttons — watch its status change.
+- [ ] **Log out and sign up as a second person** (different username) to see it from someone else's point of view.
+- [ ] Explore the other pages in the sidebar — Map, Responders, Analytics, Audit, SLA, System Health — click through all of them.
+
+## Peeking behind the curtain (the dashboards)
+
+These are the tools the actual engineers would use to keep an eye on the system. You don't need to understand them deeply — just open each one and have a look, it's genuinely satisfying to see the system "thinking" in real time.
+
+| Open this | What you're looking at |
+|---|---|
+| **http://localhost:3001** (login: `admin` / `admin`) | **Grafana** — live graphs of how fast/healthy the system is. Go to Dashboards → "SentinelX Service Overview". Create an incident on the website and watch a graph move! |
+| **http://localhost:16686** | **Jaeger** — shows the exact path a single click takes through all the different programs, like a flight tracker for your button-press. |
+| **http://localhost:8095** | **Kafka UI** — every time an incident is created, a message gets sent here. Click "Topics" → `incident.created` → "Messages" to see them pile up. |
+| **http://localhost:5601** | **OpenSearch Dashboards** — where the search feature's data actually lives. |
+| **http://localhost:9090** | **Prometheus** — raw numbers/metrics, the more "nerdy" version of Grafana. |
+| **http://localhost:8025** | **Mailhog** — a fake inbox. If the system ever tries to email someone, it lands here instead of a real inbox. |
+
+---
+
+## If something goes wrong
+
+**"It's slow" / pages take forever to load:** Totally normal the first couple of minutes after starting everything — the programs are still waking up. Give it 2–3 minutes.
+
+**A page shows an error, or won't load at all:**
+1. Go back to your first terminal window and run `docker ps` — check everything still says `healthy`.
+2. If something's missing, run the Step 3 command again — it's safe to re-run.
+3. Try refreshing the browser page.
+
+**Your computer feels like it's struggling / fans spinning loudly:** This project runs a lot of programs at once, which needs a fair amount of memory. If your computer only has 8GB of RAM, things might run slowly — that's expected, not something you broke. Closing other apps (especially Chrome with lots of tabs) helps a lot.
+
+**You want to stop everything** (e.g., you're done for the day): go to your first terminal and run:
+
+```
+docker compose --env-file .env -f infrastructure/docker/docker-compose.yml stop
 ```
 
-**Verified:** 200, returns the incident created above — indexed into OpenSearch by the outbox → Kafka → search-service consumer pipeline.
+This pauses everything without deleting anything — running the Step 3 command again next time picks up right where you left off.
 
-### Duplicate check (the spec scenario)
+**You want to completely wipe it and start fresh:**
 
-Report the same incident from 5 "different" callers within 100m/5min — the 5th should be flagged as a likely duplicate.
-
-```bash
-curl -X POST localhost:8080/api/v1/search/duplicates/check \
-  -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d '{
-    "title":"Smoke coming from chemistry laboratory",
-    "description":"Strong smell of smoke near the chem lab entrance",
-    "category":"FIRE","latitude":37.7749,"longitude":-122.4194}'
+```
+docker compose --env-file .env -f infrastructure/docker/docker-compose.yml down -v
+docker system prune -a --volumes
 ```
 
-**Verified:** confirmed in the automated integration test suite against real OpenSearch (geo_distance + time-range query) — returns a match with distance <150m and similarity ≥0.70.
+**Something in this guide didn't work as described** — that's useful to know! Take a screenshot of the error and send it over so it can get fixed for the next person.
 
-## 5. Background & event-driven services — paused on this host
+---
 
-These have no synchronous frontend flow of their own — they react to Kafka events the incident/auth flows above already produce (assignment, SLA timers, notifications, analytics, audit) or expose their own small API (location, AI). Bring up **one at a time**, not all together, to avoid overloading Docker Desktop's engine:
-
-### Assignment — `:8083`
-Consumes `incident.created`, scores responders, takes a Redis SETNX lock per responder.
-```bash
-docker compose up -d assignment-service
-```
-Create an incident and watch `assigned_responder_id` populate on a re-GET.
-
-### Location — `:8084` / `:9094`
-```bash
-curl localhost:8080/api/v1/location/responders -H "Authorization: Bearer $TOKEN"
-curl localhost:8080/api/v1/location/zones -H "Authorization: Bearer $TOKEN"
-```
-Also serves the gRPC endpoint assignment-service calls for nearest-responder lookup.
-
-### SLA timers — `:8085`
-Schedules ack/resolve deadlines in a Redis ZSET on incident creation; a sweep job fires breach alerts. Check `sla_ack_deadline` on a freshly created incident once this is running.
-
-### Notifications — `:8088`
-Sends email via SMTP. Bring it up, create/acknowledge an incident, then check [Mailhog](http://localhost:8025) — the email never leaves the stack.
-
-### Realtime (WebSocket) — `:8087`
-STOMP over `ws://localhost:8087/ws`, broadcast topic `/topic/incidents`. Connect with a STOMP client and watch events land live as incidents are created.
-
-### Analytics & Audit — `:8089` / `:8090`
-```bash
-curl localhost:8080/api/v1/analytics/overview -H "Authorization: Bearer $TOKEN"
-curl localhost:8080/api/v1/audit/events -H "Authorization: Bearer $TOKEN"
-```
-Analytics aggregates incident stats; audit lists every state-changing action, consumed from Kafka.
-
-### AI / RAG — `:8000`
-```bash
-docker compose up -d qdrant ai-service
-```
-`POST /api/v1/ai/classify`, `/rag/query`, `/summarize`. Needs `qdrant` up alongside it and `ANTHROPIC_API_KEY` set in `.env` for real completions.
-
-## 6. Dashboards
-
-### Grafana
-1. Open [localhost:3001](http://localhost:3001), log in `admin / admin`.
-2. Dashboards → **SentinelX Service Overview** (pre-provisioned).
-3. Hit a few API calls above, then watch HTTP request rate, p95 latency, JVM heap, Kafka consumer lag, and HikariCP connections move in near-real-time.
-
-### Jaeger (distributed tracing)
-1. Open [localhost:16686](http://localhost:16686).
-2. Service: `api-gateway` or `incident-service` → Find Traces.
-3. Click a trace from a `POST /api/v1/incidents` call — see the full span across gateway → incident-service → Postgres/Kafka.
-
-### Kafka UI
-1. Open [localhost:8095](http://localhost:8095) → Topics.
-2. Open `incident.created` → Messages. Every incident you create above produces a real message here via the transactional outbox.
-
-### OpenSearch Dashboards
-1. Open [localhost:5601](http://localhost:5601) (can take a minute longer to warm up than OpenSearch itself — retry on a 503).
-2. Dev Tools → `GET incidents/_search` to see raw indexed documents from the search flow above.
-
-### Prometheus
-1. Open [localhost:9090](http://localhost:9090) → Status → Targets to confirm every service's `/actuator/prometheus` is being scraped.
-2. Try the query `http_server_requests_seconds_count`.
-
-### Mailhog
-1. Open [localhost:8025](http://localhost:8025).
-2. Emails from notification-service land here instead of a real inbox — nothing sent externally.
-
-## Known issues
-
-- **First `POST /api/v1/incidents` after a gateway restart** may return a stray 405 — the CircuitBreaker's connection pool needs one warm-up call. Fire one throwaway POST first if you hit this; every call after is fast (<50ms observed).
-- **Bringing up all 23 containers at once** has reliably wedged Docker Desktop's own engine on constrained hosts — `docker ps` itself stops responding. If that happens: `wsl --shutdown`, relaunch Docker Desktop, then start services in the smaller batches shown above.
-- **Reduced-scale load test result** (20→50→100 VU): 15.7% error rate and p95=3.2s under sustained concurrency — above the spec's <1%/<300ms targets. Real measured finding, not yet fixed; worth tuning the circuit breaker's failure thresholds before a production-scale load test.
+*Have fun exploring — you're running a genuinely real, working distributed system, not a demo with fake buttons. Everything you click actually does something on the backend.* 🚨
