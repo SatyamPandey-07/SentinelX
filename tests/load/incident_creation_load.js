@@ -18,7 +18,21 @@ export const options = {
 
 const BASE_URL = __ENV.API_GATEWAY_URL || 'http://localhost:8080';
 
-export default function () {
+export function setup() {
+  const username = `load_${Date.now()}`;
+  const res = http.post(`${BASE_URL}/api/v1/auth/register`, JSON.stringify({
+    username: username,
+    email: `${username}@sentinelx.local`,
+    password: 'Password123!',
+    first_name: 'Load',
+    last_name: 'Tester'
+  }), { headers: { 'Content-Type': 'application/json' } });
+
+  const token = res.json('access_token') || '';
+  return { token: token };
+}
+
+export default function (data) {
   const idempotencyKey = `k6-${__VU}-${__ITER}-${Date.now()}`;
 
   const payload = JSON.stringify({
@@ -37,12 +51,17 @@ export default function () {
     attachment_urls: [],
   });
 
+  const authHeaders = {
+    'Content-Type': 'application/json',
+    'Idempotency-Key': idempotencyKey,
+    'X-User-Id': `load-tester-${__VU}`,
+  };
+  if (data && data.token) {
+    authHeaders['Authorization'] = `Bearer ${data.token}`;
+  }
+
   const params = {
-    headers: {
-      'Content-Type': 'application/json',
-      'Idempotency-Key': idempotencyKey,
-      'X-User-Id': `load-tester-${__VU}`,
-    },
+    headers: authHeaders,
   };
 
   // 1. Benchmark Incident Creation (POST /api/v1/incidents)
@@ -54,7 +73,7 @@ export default function () {
   });
 
   // 2. Benchmark Search Index Latency (GET /api/v1/search/incidents)
-  const searchRes = http.get(`${BASE_URL}/api/v1/search/incidents?q=Load&category=FIRE`);
+  const searchRes = http.get(`${BASE_URL}/api/v1/search/incidents?q=Load&category=FIRE`, params);
   check(searchRes, {
     'search status 200': (r) => r.status === 200,
     'search latency under 200ms': (r) => r.timings.duration < 200,

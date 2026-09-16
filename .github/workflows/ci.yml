@@ -25,6 +25,14 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
+      - name: Static Code Analysis (Checkstyle & SpotBugs)
+        run: |
+          mvn checkstyle:check spotbugs:check -B || true
+
+      - name: OWASP Dependency Vulnerability Scan
+        run: |
+          mvn org.owasp:dependency-check-maven:check -B || true
+
       - name: Compile and Run Unit Tests
         run: mvn clean test -B
 
