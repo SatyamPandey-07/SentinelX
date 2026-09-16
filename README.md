@@ -7,9 +7,16 @@
 ![Redis](https://img.shields.io/badge/Redis-7-red)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-PostGIS-blue)
 ![OpenSearch](https://img.shields.io/badge/OpenSearch-2.x-teal)
+![Qdrant](https://img.shields.io/badge/Qdrant-Vector%20DB-dc244c)
+![gRPC](https://img.shields.io/badge/gRPC-Internal%20RPC-4285F4)
 ![Python](https://img.shields.io/badge/Python-FastAPI-yellow)
 ![Go](https://img.shields.io/badge/Go-Healthcheck%20CLI-00ADD8)
 ![Next.js](https://img.shields.io/badge/Frontend-Next.js%2014-black)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED)
+![Kubernetes](https://img.shields.io/badge/Kubernetes-Kustomize-326CE5)
+![CI](https://img.shields.io/badge/CI-GitHub%20Actions-2088FF)
+![Observability](https://img.shields.io/badge/Observability-OTel%20%2B%20Prometheus%20%2B%20Grafana-e6522c)
+![OpenAPI](https://img.shields.io/badge/API%20Docs-OpenAPI%2FSwagger-85EA2D)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
 SentinelX is a production-grade distributed emergency and incident management platform built for large campuses (universities, corporate complexes, and industrial sites). The system coordinates incident ingestion, AI hazard classification with deterministic safety guardrails, spatial-temporal duplicate detection, intelligent responder dispatch with distributed locking, real-time SLA tracking via Redis sorted sets, and an immutable cryptographic audit ledger.
@@ -95,6 +102,9 @@ SentinelX adopts a **Database-Per-Service** microservices architecture connected
    - Every consumer verifies event IDs in Redis or database unique constraint tables before processing, safely ignoring redeliveries.
 7. **Dead Letter Queue (DLQ) & Exponential Backoff (`notification-service`)**:
    - Failed notifications retry up to 3 times with exponential backoff before routing to `notification.requested.DLQ` for administrator investigation.
+8. **Redis-Backed Distributed Rate Limiting (`api-gateway`)**:
+   - Every route enforces a Spring Cloud Gateway `RedisRateLimiter` (token bucket) keyed per-authenticated-user (JWT subject) or per-IP for anonymous callers, so the limit is shared correctly across every gateway replica instead of being per-instance.
+   - Auth endpoints get the strictest bucket (credential-stuffing target); incident creation gets a deliberately generous one so emergency reporting stays available under load; AI endpoints get the tightest non-auth bucket since each request triggers an LLM call.
 
 ---
 
@@ -128,6 +138,7 @@ On a resource-constrained machine, starting all 23 containers at once can overlo
 - **Grafana Dashboards**: `http://localhost:3001` (User: `admin` / Pass: `admin`)
 - **Jaeger Tracing**: `http://localhost:16686`
 - **MailHog Inbox**: `http://localhost:8025`
+- **Swagger UI (per service)**: `http://localhost:<port>/swagger-ui.html`, e.g. `http://localhost:8082/swagger-ui.html` for incident-service, `http://localhost:8080/swagger-ui.html` for the gateway. Raw OpenAPI JSON is at `/v3/api-docs` on the same port.
 
 ### Step 3: Run the Services
 ```bash
@@ -190,5 +201,4 @@ k6 run tests/load/incident_creation_load.js
 | [docs/FAILURE_HANDLING.md](file:///d:/VIGIL/docs/FAILURE_HANDLING.md) | Graceful degradation matrix for broker, database, and AI outages |
 | [docs/TESTING.md](file:///d:/VIGIL/docs/TESTING.md) | Unit, integration, chaos engineering, and k6 load testing execution |
 | [docs/CI_CD.md](file:///d:/VIGIL/docs/CI_CD.md) | GitHub Actions CI/CD workflows, quality gates, and container security scanning |
-| [docs/OPERATIONS_LINUX.md](file:///d:/VIGIL/docs/OPERATIONS_LINUX.md) | Linux OS internals, JVM memory vs Cgroups, socket states, and CLI diagnostics |
-| [docs/adr/](file:///d:/VIGIL/docs/adr) | 12 Architecture Decision Records (ADR-001 through ADR-012) |
+| [d
