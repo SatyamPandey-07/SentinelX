@@ -62,4 +62,11 @@ ENV OTEL_SERVICE_NAME=api-gateway \
     OTEL_PROPAGATORS=tracecontext,baggage \
     OTEL_JAVAAGENT_ENABLED=true
 
-ENTRYPOINT ["java", "-javaagent:/app/otel-javaagent.jar", "-XX:MaxRAMPercentage=75.0", "-jar", "app.jar"]
+# networkaddress.cache.ttl: without a SecurityManager the JVM's default
+# successful-lookup DNS cache is long enough that a peer container being
+# recreated (a routine `docker compose up -d --build <service>`, which
+# always gets a new internal IP) can leave this JVM holding a stale IP
+# for that hostname until restarted -- reproduced live: api-gateway kept
+# routing to auth-service's old IP (NoRouteToHostException) after a
+# rebuild. 10s keeps re-resolution fast without re-querying per request.
+ENTRYPOINT ["java", "-javaagent:/app/otel-javaagent.jar", "-XX:MaxRAMPercentage=75.0", "-Dnetworkaddress.cache.ttl=10", "-jar", "app.jar"]

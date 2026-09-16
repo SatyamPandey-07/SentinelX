@@ -62,4 +62,4 @@ ENV OTEL_SERVICE_NAME=analytics-service \
     OTEL_PROPAGATORS=tracecontext,baggage \
     OTEL_JAVAAGENT_ENABLED=true
 
-ENTRYPOINT ["java", "-javaagent:/app/otel-javaagent.jar", "-XX:MaxRAMPercentage=75.0", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-javaagent:/app/otel-javaagent.jar", "-XX:MaxRAMPercentage=75.0", "-Dnetworkaddress.cache.ttl=10", "-jar", "app.jar"]

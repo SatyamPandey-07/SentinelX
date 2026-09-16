@@ -6,6 +6,7 @@ import { Shield, Radio, Activity, Bell, User, Clock, Search } from 'lucide-react
 
 export function Navbar() {
   const [time, setTime] = useState<string>('');
+  const [user, setUser] = useState<{ username: string; role: string } | null>(null);
 
   useEffect(() => {
     const update = () => {
@@ -14,6 +15,14 @@ export function Navbar() {
     };
     update();
     const interval = setInterval(update, 1000);
+
+    try {
+      const raw = localStorage.getItem('sentinelx_user');
+      if (raw) setUser(JSON.parse(raw));
+    } catch {
+      // corrupt/absent session data -- fall back to the placeholder below
+    }
+
     return () => clearInterval(interval);
   }, []);
 
@@ -67,8 +76,8 @@ export function Navbar() {
             <User className="w-4 h-4" />
           </div>
           <div className="hidden sm:block text-left">
-            <div className="text-xs font-bold text-slate-200 font-mono">Ops Commander</div>
-            <div className="text-[10px] text-slate-400 font-mono">ROLE_SUPERVISOR</div>
+            <div className="text-xs font-bold text-slate-200 font-mono">{user?.username ?? 'Ops Commander'}</div>
+            <div className="text-[10px] text-slate-400 font-mono">{user?.role ?? 'ROLE_SUPERVISOR'}</div>
           </div>
         </div>
       </div>

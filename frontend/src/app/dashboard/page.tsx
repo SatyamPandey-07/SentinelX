@@ -2,14 +2,15 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { 
-  Flame, 
-  HeartPulse, 
-  ShieldAlert, 
-  Clock, 
-  CheckCircle2, 
-  UserCheck, 
-  Radio, 
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Flame,
+  HeartPulse,
+  ShieldAlert,
+  Clock,
+  CheckCircle2,
+  UserCheck,
+  Radio,
   Plus,
   Cpu,
   Lock,
@@ -25,6 +26,16 @@ import {
   Sparkles
 } from 'lucide-react';
 import { MOCK_INCIDENTS, MOCK_RESPONDERS, Incident } from '@/lib/mock-data';
+import { AnimatedNumber } from '@/components/AnimatedNumber';
+
+const columnReveal = {
+  hidden: { opacity: 0, y: 14 },
+  show: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: { delay: i * 0.08, duration: 0.4, ease: [0.16, 1, 0.3, 1] },
+  }),
+};
 
 export default function DashboardPage() {
   const [incidents, setIncidents] = useState<Incident[]>(MOCK_INCIDENTS);
@@ -71,11 +82,11 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex items-center gap-3 text-xs font-mono text-slate-400">
-          <span>ACTIVE: <strong className="text-white">12</strong></span>
+          <span>ACTIVE: <strong className="text-white"><AnimatedNumber value={12} /></strong></span>
           <span className="text-slate-600">/</span>
-          <span>RESPONDERS: <strong className="text-emerald-400">148</strong></span>
+          <span>RESPONDERS: <strong className="text-emerald-400"><AnimatedNumber value={148} /></strong></span>
           <span className="text-slate-600">/</span>
-          <span>SLA: <strong className="text-cyan-400">98.7%</strong></span>
+          <span>SLA: <strong className="text-cyan-400"><AnimatedNumber value={98.7} decimals={1} suffix="%" /></strong></span>
         </div>
       </div>
 
@@ -83,11 +94,16 @@ export default function DashboardPage() {
           3-COLUMN ENTERPRISE COMMAND CENTER LAYOUT
           ======================================================== */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 h-[calc(100vh-9.5rem)]">
-        
+
         {/* ========================================================
             LEFT COLUMN (3 COLS): INCIDENT STREAM LIST
             ======================================================== */}
-        <div className="lg:col-span-4 rounded-xl border border-white/[0.08] bg-[#0A0D14] p-4 flex flex-col justify-between overflow-hidden">
+        <motion.div
+          custom={0}
+          variants={columnReveal}
+          initial="hidden"
+          animate="show"
+          className="lg:col-span-4 rounded-xl border border-white/[0.08] bg-[#0A0D14] p-4 flex flex-col justify-between overflow-hidden">
           <div className="space-y-3 flex-1 flex flex-col overflow-hidden">
             <div className="flex items-center justify-between pb-2 border-b border-white/[0.08]">
               <span className="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
@@ -101,15 +117,19 @@ export default function DashboardPage() {
 
             {/* Scrollable Incident Cards List */}
             <div className="space-y-2.5 overflow-y-auto pr-1 flex-1">
-              {incidents.map((inc) => {
+              {incidents.map((inc, idx) => {
                 const isSelected = selectedIncident?.id === inc.id;
                 const isCrit = inc.severity === 'CRITICAL';
 
                 return (
-                  <button
+                  <motion.button
                     key={inc.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.05 * idx, duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                    whileHover={{ x: 2 }}
                     onClick={() => setSelectedIncident(inc)}
-                    className={`w-full text-left p-3 rounded-lg border transition-all ${
+                    className={`w-full text-left p-3 rounded-lg border transition-colors ${
                       isSelected
                         ? 'border-cyan-500/80 bg-cyan-950/20 shadow-lg shadow-cyan-500/10'
                         : isCrit
@@ -154,12 +174,17 @@ export default function DashboardPage() {
             <span>Event Backbone: Kafka KRaft</span>
             <span className="text-emerald-400">0 lag</span>
           </div>
-        </div>
+        </motion.div>
 
         {/* ========================================================
             CENTER COLUMN (5 COLS): LARGE INTERACTIVE CAMPUS MAP
             ======================================================== */}
-        <div className="lg:col-span-5 rounded-xl border border-white/[0.08] bg-[#080A0F] p-4 flex flex-col justify-between relative overflow-hidden select-none">
+        <motion.div
+          custom={1}
+          variants={columnReveal}
+          initial="hidden"
+          animate="show"
+          className="lg:col-span-5 rounded-xl border border-white/[0.08] bg-[#080A0F] p-4 flex flex-col justify-between relative overflow-hidden select-none">
           
           {/* Map Top Bar */}
           <div className="flex items-center justify-between pb-2 border-b border-white/[0.08] z-10 text-xs font-mono">
@@ -261,14 +286,26 @@ export default function DashboardPage() {
             <span>Location Engine: PostGIS / Haversine gRPC</span>
             <span className="text-cyan-400">Zone North Geofence Locked</span>
           </div>
-        </div>
+        </motion.div>
 
         {/* ========================================================
             RIGHT COLUMN (3 COLS): SELECTED INCIDENT ACTION DOSSIER
             ======================================================== */}
-        <div className="lg:col-span-3 rounded-xl border border-white/[0.08] bg-[#0A0D14] p-4 flex flex-col justify-between overflow-y-auto space-y-4">
-          
-          <div className="space-y-4">
+        <motion.div
+          custom={2}
+          variants={columnReveal}
+          initial="hidden"
+          animate="show"
+          className="lg:col-span-3 rounded-xl border border-white/[0.08] bg-[#0A0D14] p-4 flex flex-col justify-between overflow-y-auto space-y-4">
+
+          <AnimatePresence mode="wait">
+          <motion.div
+            key={selectedIncident.id}
+            initial={{ opacity: 0, x: 8 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -8 }}
+            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            className="space-y-4">
             {/* Header & Severity */}
             <div className="flex items-center justify-between pb-3 border-b border-white/[0.08]">
               <div>
@@ -329,23 +366,28 @@ export default function DashboardPage() {
                 {selectedIncident.ai_reasoning || "High-consequence pattern verified. Deterministic safety override active."}
               </p>
             </div>
-          </div>
+          </motion.div>
+          </AnimatePresence>
 
           {/* Action Buttons */}
           <div className="space-y-2 pt-3 border-t border-white/[0.08]">
             <div className="grid grid-cols-2 gap-2">
-              <button
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.97 }}
                 onClick={() => handleAction('ACKNOWLEDGE')}
                 className="py-2 px-3 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-slate-950 text-xs font-bold font-mono transition-colors"
               >
                 ACKNOWLEDGE
-              </button>
-              <button
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.97 }}
                 onClick={() => handleAction('ESCALATE')}
                 className="py-2 px-3 rounded-lg bg-red-600/80 hover:bg-red-600 text-white text-xs font-bold font-mono transition-colors"
               >
                 ESCALATE
-              </button>
+              </motion.button>
             </div>
 
             <div className="grid grid-cols-2 gap-2">
@@ -364,7 +406,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-        </div>
+        </motion.div>
 
       </div>
     </div>

@@ -2,20 +2,20 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { 
-  Radio, 
-  AlertTriangle, 
-  Users, 
-  MapPin, 
-  BarChart3, 
-  ScrollText, 
-  Server, 
+import { useRouter, usePathname } from 'next/navigation';
+import { motion } from 'framer-motion';
+import {
+  Radio,
+  AlertTriangle,
+  Users,
+  MapPin,
+  BarChart3,
+  ScrollText,
+  Server,
   Clock,
   Bot,
-  Settings, 
+  Settings,
   LogOut,
-  Shield
 } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -33,6 +33,14 @@ const NAV_ITEMS = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  const handleLogout = () => {
+    localStorage.removeItem('sentinelx_token');
+    localStorage.removeItem('sentinelx_refresh_token');
+    localStorage.removeItem('sentinelx_user');
+    router.push('/login');
+  };
 
   return (
     <aside className="w-64 border-r border-white/[0.08] bg-[#080A0F] flex flex-col justify-between h-[calc(100vh-4rem)] sticky top-16">
@@ -48,18 +56,25 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-mono font-medium transition-all ${
+              className={`relative flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-mono font-medium transition-colors ${
                 isActive
-                  ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
-                  : 'text-slate-400 hover:text-slate-100 hover:bg-white/[0.04]'
+                  ? 'text-cyan-300'
+                  : 'text-slate-400 hover:text-slate-100'
               }`}
             >
-              <div className="flex items-center gap-3">
+              {isActive && (
+                <motion.div
+                  layoutId="sidebar-active-pill"
+                  className="absolute inset-0 rounded-xl bg-cyan-500/15 border border-cyan-500/30"
+                  transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+                />
+              )}
+              <div className="relative flex items-center gap-3">
                 <Icon className={`w-4 h-4 ${isActive ? 'text-cyan-400' : 'text-slate-500'}`} />
                 <span>{item.label}</span>
               </div>
               {item.badge && (
-                <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${
+                <span className={`relative text-[10px] px-1.5 py-0.2 rounded font-mono ${
                   isActive
                     ? 'bg-cyan-500/20 text-cyan-300'
                     : 'bg-slate-800 text-slate-400'
@@ -89,13 +104,13 @@ export function Sidebar() {
           </div>
         </div>
 
-        <Link
-          href="/login"
-          className="mt-3 flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-mono text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+        <button
+          onClick={handleLogout}
+          className="mt-3 w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-mono text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
         >
           <LogOut className="w-4 h-4" />
           <span>Exit Tactical Session</span>
-        </Link>
+        </button>
       </div>
     </aside>
   );
