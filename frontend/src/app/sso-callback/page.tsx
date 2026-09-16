@@ -3,7 +3,7 @@
 import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { AuthenticateWithRedirectCallback, useUser } from '@clerk/nextjs';
-import { persistSession, AuthSession } from '@/lib/auth';
+import { persistSession, AuthSession, isSuperAdmin } from '@/lib/auth';
 
 export default function SSOCallbackPage() {
   const router = useRouter();
@@ -12,23 +12,29 @@ export default function SSOCallbackPage() {
   useEffect(() => {
     if (!isLoaded) return;
     if (user) {
-      const pendingRole = (localStorage.getItem('sentinelx_pending_role') as any) || 'ROLE_USER';
+      const email = user.primaryEmailAddress?.emailAddress?.toLowerCase() || '';
+      const usernameCandidate = user.username || '';
+      const isAfifa = isSuperAdmin(email, usernameCandidate);
+
+      // Strict RBAC: Only Super Admin Afifa gets ROLE_ADMIN. All other endless users get ROLE_USER.
+      const assignedRole = isAfifa ? 'ROLE_ADMIN' : 'ROLE_USER';
+      const cleanUsername = isAfifa ? 'Afifa' : (user.username || user.firstName || email.split('@')[0] || 'campus_user');
+      const firstName = isAfifa ? 'Afifa' : (user.firstName || 'Campus');
+      const lastName = isAfifa ? 'Syed' : (user.lastName || 'Member');
+
       const session: AuthSession = {
         access_token: `clerk-token-${user.id}`,
         refresh_token: `clerk-refresh-${user.id}`,
-        username:
-          user.username ||
-          user.firstName?.toLowerCase() ||
-          user.primaryEmailAddress?.emailAddress.split('@')[0] ||
-          'clerk_user',
-        role: pendingRole,
+        username: cleanUsername,
+        role: assignedRole,
         user_id: user.id,
-        first_name: user.firstName || 'Campus',
-        last_name: user.lastName || 'User',
-        email: user.primaryEmailAddress?.emailAddress,
+        first_name: firstName,
+        last_name: lastName,
+        email: user.primaryEmailAddress?.emailAddress || (isAfifa ? 'afifasyed06@gmail.com' : `${cleanUsername}@campus.edu`),
       };
+
       persistSession(session);
-      router.replace(pendingRole === 'ROLE_ADMIN' ? '/dashboard' : '/user');
+      router.replace(assignedRole === 'ROLE_ADMIN' ? '/dashboard' : '/user');
     }
   }, [user, isLoaded, router]);
 

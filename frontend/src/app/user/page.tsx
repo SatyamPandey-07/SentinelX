@@ -25,7 +25,7 @@ import {
   ChevronRight,
   ExternalLink,
 } from 'lucide-react';
-import { getSession, AuthSession } from '@/lib/auth';
+import { getSession, AuthSession, formatDisplayName } from '@/lib/auth';
 
 interface UserIncident {
   id: string;
@@ -122,7 +122,7 @@ export default function UserPortalPage() {
       const newReport: IncidentRecord = {
         id: newId,
         reporter_id: session?.user_id || session?.username || 'usr-campus',
-        reporter_name: session?.first_name ? `${session.first_name} ${session.last_name}` : (session?.username || 'Campus Reporter'),
+        reporter_name: formatDisplayName(session),
         title,
         description,
         category: category as any,

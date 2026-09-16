@@ -11,9 +11,10 @@ import {
   LogOut,
   ShieldAlert,
   ChevronRight,
+  Crown,
 } from 'lucide-react';
-import { getSession, clearSession, AuthSession } from '@/lib/auth';
-import { SignedIn, SignedOut, UserButton } from '@clerk/nextjs';
+import { getSession, clearSession, AuthSession, formatDisplayName, isSuperAdmin } from '@/lib/auth';
+import { SignedIn, UserButton } from '@clerk/nextjs';
 
 export function Navbar() {
   const router = useRouter();
@@ -38,7 +39,8 @@ export function Navbar() {
     };
   }, []);
 
-  const isAdmin = session?.role === 'ROLE_ADMIN' || session?.role === 'ROLE_SUPERVISOR';
+  const isAdmin = session?.role === 'ROLE_ADMIN' || session?.role === 'ROLE_SUPERVISOR' || isSuperAdmin(session?.email, session?.username);
+  const displayName = formatDisplayName(session);
 
   const handleLogout = () => {
     clearSession();
@@ -60,9 +62,9 @@ export function Navbar() {
           <div>
             <div className="flex items-center gap-2">
               <span className="font-black text-lg tracking-widest text-white font-mono uppercase">SENTINELX</span>
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono border flex items-center gap-1 font-bold ${
+              <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-mono border flex items-center gap-1.5 font-bold ${
                 isAdmin
-                  ? 'bg-red-500/10 text-red-400 border-red-500/30'
+                  ? 'bg-red-500/15 text-red-400 border-red-500/40 shadow-sm shadow-red-500/20'
                   : 'bg-cyan-500/10 text-cyan-300 border border-cyan-500/30'
               }`}>
                 <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${isAdmin ? 'bg-red-400' : 'bg-cyan-400'}`} />
@@ -70,7 +72,7 @@ export function Navbar() {
               </span>
             </div>
             <p className="text-[10px] text-slate-400 font-mono">
-              {isAdmin ? 'Emergency Operations & Dispatch' : 'Campus Community Emergency Reporting'}
+              {isAdmin ? 'Emergency Operations & Tactical Dispatch' : 'Campus Community Emergency Reporting'}
             </p>
           </div>
         </Link>
@@ -84,7 +86,7 @@ export function Navbar() {
         </div>
 
         <div className="flex items-center gap-2 text-slate-300 bg-black/40 px-3 py-1.5 rounded-lg border border-white/[0.06]">
-          <span>STATUS: <strong className={isAdmin ? 'text-red-400' : 'text-cyan-400'}>{isAdmin ? 'DISPATCH LEVEL 4' : 'REPORTER ONLINE'}</strong></span>
+          <span>CLEARANCE: <strong className={isAdmin ? 'text-red-400' : 'text-cyan-400'}>{isAdmin ? 'SUPER ADMIN (AFIFA)' : 'CAMPUS MEMBER'}</strong></span>
         </div>
       </div>
 
@@ -95,7 +97,7 @@ export function Navbar() {
           <span>{time || '00:00:00 UTC'}</span>
         </div>
 
-        {/* Clickable Profile Card -> opens /profile */}
+        {/* Clean Human Profile Link -> opens /profile */}
         <Link
           href="/profile"
           id="nav-profile-btn"
@@ -104,18 +106,18 @@ export function Navbar() {
         >
           <div className={`w-8 h-8 rounded-full border flex items-center justify-center transition-all ${
             isAdmin
-              ? 'bg-red-600/20 border-red-500/40 text-red-400 group-hover:border-red-400 group-hover:bg-red-600/30'
+              ? 'bg-red-600/20 border-red-500/40 text-red-400 group-hover:border-red-400 group-hover:bg-red-600/30 shadow-sm shadow-red-500/20'
               : 'bg-cyan-600/20 border-cyan-500/40 text-cyan-400 group-hover:border-cyan-400 group-hover:bg-cyan-600/30'
           }`}>
-            {isAdmin ? <ShieldAlert className="w-4 h-4" /> : <User className="w-4 h-4" />}
+            {isAdmin ? <Crown className="w-4 h-4 text-red-400" /> : <User className="w-4 h-4" />}
           </div>
           <div className="hidden sm:block text-left">
             <div className="text-xs font-bold text-slate-200 font-mono group-hover:text-cyan-300 flex items-center gap-1 transition-colors">
-              <span>{session?.username ?? (isAdmin ? 'admin' : 'campus_user')}</span>
+              <span>{displayName}</span>
               <ChevronRight className="w-3 h-3 text-slate-500 group-hover:text-cyan-400 transition-transform group-hover:translate-x-0.5" />
             </div>
-            <div className={`text-[10px] font-mono font-bold ${isAdmin ? 'text-red-400' : 'text-cyan-400'}`}>
-              {session?.role ?? (isAdmin ? 'ROLE_ADMIN' : 'ROLE_USER')}
+            <div className={`text-[10px] font-mono font-bold tracking-wider ${isAdmin ? 'text-red-400' : 'text-cyan-400'}`}>
+              {isAdmin ? 'SUPER ADMIN' : 'CAMPUS USER'}
             </div>
           </div>
         </Link>

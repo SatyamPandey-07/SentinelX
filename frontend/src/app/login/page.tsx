@@ -19,8 +19,10 @@ import {
   Eye,
   EyeOff,
   Sparkles,
+  Crown,
+  Info,
 } from 'lucide-react';
-import { authenticate, registerUser, persistSession, AuthSession } from '@/lib/auth';
+import { authenticate, registerUser, persistSession, AuthSession, isSuperAdmin } from '@/lib/auth';
 import { useSignIn } from '@clerk/nextjs';
 
 type ViewMode = 'signup' | 'signin';
@@ -41,18 +43,17 @@ function LoginContent() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [showPassword, setShowPassword] = useState(false);
 
-  // Sign In State (starts empty)
+  // Sign In State
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
-  // Sign Up State
+  // Sign Up State (for endless campus members)
   const [suFirstName, setSuFirstName] = useState('');
   const [suLastName, setSuLastName] = useState('');
   const [suUsername, setSuUsername] = useState('');
   const [suEmail, setSuEmail] = useState('');
   const [suPassword, setSuPassword] = useState('');
   const [suConfirm, setSuConfirm] = useState('');
-  const [adminAuthKey, setAdminAuthKey] = useState('');
 
   useEffect(() => {
     const urlMode = searchParams.get('mode') as ViewMode;
@@ -72,7 +73,7 @@ function LoginContent() {
   };
 
   const handleRouteAfterAuth = (session: AuthSession) => {
-    if (session.role === 'ROLE_ADMIN' || session.role === 'ROLE_SUPERVISOR') {
+    if (session.role === 'ROLE_ADMIN' || session.role === 'ROLE_SUPERVISOR' || isSuperAdmin(session.email, session.username)) {
       router.push('/dashboard');
     } else {
       router.push('/user');
@@ -99,15 +100,11 @@ function LoginContent() {
     setFieldErrors({});
 
     const errors: Record<string, string> = {};
-
     if (suPassword !== suConfirm) {
       errors.confirm = 'Passwords do not match';
     }
     if (suPassword.length < 8) {
       errors.password = 'Password must be at least 8 characters long';
-    }
-    if (selectedRole === 'ADMIN' && adminAuthKey && adminAuthKey !== 'SENTINEL-ADMIN-2026') {
-      errors.adminKey = 'Invalid Admin Passcode. Use SENTINEL-ADMIN-2026 or leave blank for demo.';
     }
 
     if (Object.keys(errors).length > 0) {
@@ -118,13 +115,14 @@ function LoginContent() {
     setLoading(true);
 
     try {
+      // Strict RBAC: All public signups are assigned USER mode. Only Afifa holds Super Admin rights.
       const session = await registerUser({
         username: suUsername.trim(),
         email: suEmail.trim(),
         password: suPassword,
         first_name: suFirstName.trim(),
         last_name: suLastName.trim(),
-        role: selectedRole,
+        role: 'USER',
       });
 
       handleRouteAfterAuth(session);
@@ -136,7 +134,7 @@ function LoginContent() {
 
   const { signIn } = useSignIn();
 
-  // Google / Gmail & GitHub Social Login (Clerk / OAuth Compatible)
+  // Clean Social Login (Google / Gmail & GitHub)
   const handleSocialAuth = async (provider: 'google' | 'github') => {
     setSocialLoading(provider);
     setError(null);
@@ -152,32 +150,39 @@ function LoginContent() {
         });
         return;
       } catch (clerkErr) {
-        console.warn('Clerk direct OAuth attempt, using fallback simulation:', clerkErr);
+        console.warn('Clerk OAuth initiated, fallback if running local mock:', clerkErr);
       }
     }
 
-    // Seamless fallback simulation for local testing
+    // High fidelity fallback simulation: Never outputs ugly `google_user_414`!
     setTimeout(() => {
-      const email =
-        provider === 'google'
-          ? (selectedRole === 'ADMIN' ? 'admin.commander@gmail.com' : 'campus.student@gmail.com')
-          : (selectedRole === 'ADMIN' ? 'admin_ops@github.com' : 'campus_dev@github.com');
-      const name =
-        provider === 'google'
-          ? (selectedRole === 'ADMIN' ? 'Google Admin' : 'Google Campus User')
-          : (selectedRole === 'ADMIN' ? 'GitHub Admin' : 'GitHub Campus User');
-      const genUsername = `${provider}_${selectedRole.toLowerCase()}_${Math.floor(100 + Math.random() * 900)}`;
+      let session: AuthSession;
 
-      const session: AuthSession = {
-        access_token: `oauth-${provider}-${Date.now()}`,
-        refresh_token: `oauth-refresh-${provider}-${Date.now()}`,
-        username: genUsername,
-        role: selectedRole === 'ADMIN' ? 'ROLE_ADMIN' : 'ROLE_USER',
-        user_id: `usr-${provider}-${Date.now().toString(36)}`,
-        first_name: name.split(' ')[0],
-        last_name: name.split(' ')[1] || 'User',
-        email,
-      };
+      if (selectedRole === 'ADMIN') {
+        // Super Admin Afifa identity
+        session = {
+          access_token: `oauth-superadmin-${Date.now()}`,
+          refresh_token: `oauth-refresh-${Date.now()}`,
+          username: 'Afifa',
+          role: 'ROLE_ADMIN',
+          user_id: 'usr-superadmin-afifa',
+          first_name: 'Afifa',
+          last_name: 'Syed',
+          email: 'afifasyed06@gmail.com',
+        };
+      } else {
+        // Endless Campus User identity
+        session = {
+          access_token: `oauth-user-${Date.now()}`,
+          refresh_token: `oauth-refresh-${Date.now()}`,
+          username: 'Alex Reynolds',
+          role: 'ROLE_USER',
+          user_id: `usr-campus-${Date.now().toString(36)}`,
+          first_name: 'Alex',
+          last_name: 'Reynolds',
+          email: 'alex.reynolds@campus.edu',
+        };
+      }
 
       persistSession(session);
       setSocialLoading(null);
@@ -187,11 +192,13 @@ function LoginContent() {
 
   const fillQuickDemo = (type: 'admin' | 'user') => {
     if (type === 'admin') {
-      setUsername('admin');
+      setSelectedRole('ADMIN');
+      setUsername('afifa');
       setPassword('Admin@12345');
       setMode('signin');
       setError(null);
     } else {
+      setSelectedRole('USER');
       setUsername('campus_user');
       setPassword('User@12345');
       setMode('signin');
@@ -220,7 +227,7 @@ function LoginContent() {
         initial={{ opacity: 0, y: 18, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-        className="w-full max-w-lg bg-slate-900/80 border border-slate-800 rounded-2xl p-6 sm:p-8 relative z-10 shadow-2xl shadow-black/60 backdrop-blur-xl space-y-5"
+        className="w-full max-w-lg bg-slate-900/85 border border-slate-800 rounded-2xl p-6 sm:p-8 relative z-10 shadow-2xl shadow-black/60 backdrop-blur-xl space-y-5"
       >
         {/* Header with Brand */}
         <div className="text-center space-y-1.5">
@@ -228,110 +235,105 @@ function LoginContent() {
             initial={{ scale: 0.7, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: 0.1, duration: 0.4, ease: 'backOut' }}
-            className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-red-500/20 border border-cyan-500/40 text-cyan-400 mb-1 shadow-[0_0_35px_-8px_rgba(56,189,248,0.5)]"
+            className={`inline-flex items-center justify-center w-14 h-14 rounded-2xl border mb-1 transition-all ${
+              selectedRole === 'ADMIN'
+                ? 'bg-red-500/20 border-red-500/40 text-red-400 shadow-[0_0_35px_-8px_rgba(239,68,68,0.5)]'
+                : 'bg-cyan-500/20 border-cyan-500/40 text-cyan-400 shadow-[0_0_35px_-8px_rgba(56,189,248,0.5)]'
+            }`}
           >
-            <ShieldAlert className="w-8 h-8 text-cyan-400" />
+            {selectedRole === 'ADMIN' ? <Crown className="w-8 h-8 text-red-400" /> : <ShieldAlert className="w-8 h-8 text-cyan-400" />}
           </motion.div>
           <h1 className="text-2xl font-black font-mono tracking-wider text-slate-100">
-            SENTINEL<span className="text-red-500">X</span>
+            SENTINEL<span className={selectedRole === 'ADMIN' ? 'text-red-500' : 'text-cyan-400'}>X</span>
           </h1>
           <p className="text-xs font-mono text-slate-400 uppercase tracking-wider">
-            {mode === 'signup' ? 'Create Account • Choose Operational Mode' : 'Secure Command & Incident Response Login'}
+            {selectedRole === 'ADMIN'
+              ? 'Super Admin Portal • Restricted to Afifa'
+              : 'Campus Safety & Emergency Response Network'}
           </p>
         </div>
 
-        {/* Mode Switch Tabs (Sign Up First Flow) */}
-        <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-slate-950/90 border border-slate-800 font-mono text-xs">
-          <button
-            type="button"
-            id="tab-signup"
-            onClick={() => switchMode('signup')}
-            className={`py-2.5 rounded-lg tracking-wider font-semibold flex items-center justify-center gap-2 transition-all ${
-              mode === 'signup'
-                ? 'bg-gradient-to-r from-cyan-600 to-cyan-500 text-white shadow-md shadow-cyan-600/30'
-                : 'text-slate-400 hover:text-slate-200'
+        {/* Operational Role Architecture Selector */}
+        <div className="grid grid-cols-2 gap-2.5">
+          {/* USER MODE (Endless Users) */}
+          <div
+            id="role-select-user"
+            onClick={() => {
+              setSelectedRole('USER');
+              setError(null);
+            }}
+            className={`cursor-pointer p-3 rounded-xl border transition-all relative ${
+              selectedRole === 'USER'
+                ? 'bg-cyan-950/50 border-cyan-500 shadow-md shadow-cyan-500/20'
+                : 'bg-slate-950/60 border-slate-800 hover:border-slate-700 opacity-60 hover:opacity-100'
             }`}
           >
-            <UserPlus className="w-3.5 h-3.5" />
-            <span>1. SIGN UP (NEW)</span>
-          </button>
-          <button
-            type="button"
-            id="tab-signin"
-            onClick={() => switchMode('signin')}
-            className={`py-2.5 rounded-lg tracking-wider font-semibold flex items-center justify-center gap-2 transition-all ${
-              mode === 'signin'
-                ? 'bg-gradient-to-r from-cyan-600 to-cyan-500 text-white shadow-md shadow-cyan-600/30'
-                : 'text-slate-400 hover:text-slate-200'
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-1.5">
+                <Shield className="w-4 h-4 text-cyan-400" />
+                <span className="font-bold text-slate-100 text-xs font-mono">CAMPUS USER</span>
+              </div>
+              {selectedRole === 'USER' && <CheckCircle2 className="w-4 h-4 text-cyan-400" />}
+            </div>
+            <p className="text-[10px] font-mono text-slate-400 leading-snug">
+              Students &amp; Staff (Endless). SOS, Incidents &amp; Alerts.
+            </p>
+          </div>
+
+          {/* ADMIN MODE (Afifa Only) */}
+          <div
+            id="role-select-admin"
+            onClick={() => {
+              setSelectedRole('ADMIN');
+              setMode('signin'); // Admin is for Afifa sign in
+              setError(null);
+            }}
+            className={`cursor-pointer p-3 rounded-xl border transition-all relative ${
+              selectedRole === 'ADMIN'
+                ? 'bg-red-950/50 border-red-500 shadow-md shadow-red-500/20'
+                : 'bg-slate-950/60 border-slate-800 hover:border-slate-700 opacity-60 hover:opacity-100'
             }`}
           >
-            <Lock className="w-3.5 h-3.5" />
-            <span>2. SIGN IN</span>
-          </button>
-        </div>
-
-        {/* Operational Mode Selection Cards */}
-        <div>
-          <label className="block text-slate-300 font-bold mb-1.5 text-xs font-mono tracking-wider">
-            OPERATIONAL CLEARANCE MODE
-          </label>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            {/* USER MODE CARD */}
-            <div
-              onClick={() => setSelectedRole('USER')}
-              className={`cursor-pointer p-3 rounded-xl border transition-all relative ${
-                selectedRole === 'USER'
-                  ? 'bg-cyan-950/40 border-cyan-500 shadow-md shadow-cyan-500/15'
-                  : 'bg-slate-950/60 border-slate-800 hover:border-slate-700 opacity-70 hover:opacity-100'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center gap-1.5">
-                  <Shield className="w-4 h-4 text-cyan-400" />
-                  <span className="font-bold text-slate-100 text-xs font-mono">USER MODE</span>
-                </div>
-                {selectedRole === 'USER' && (
-                  <CheckCircle2 className="w-4 h-4 text-cyan-400" />
-                )}
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-1.5">
+                <Crown className="w-4 h-4 text-red-400" />
+                <span className="font-bold text-slate-100 text-xs font-mono">SUPER ADMIN</span>
               </div>
-              <p className="text-[10px] font-mono text-slate-400 leading-snug">
-                Campus Student / Staff. Emergency SOS &amp; Incident Reporting.
-              </p>
+              {selectedRole === 'ADMIN' && <CheckCircle2 className="w-4 h-4 text-red-400" />}
             </div>
-
-            {/* ADMIN MODE CARD */}
-            <div
-              onClick={() => setSelectedRole('ADMIN')}
-              className={`cursor-pointer p-3 rounded-xl border transition-all relative ${
-                selectedRole === 'ADMIN'
-                  ? 'bg-red-950/40 border-red-500 shadow-md shadow-red-500/15'
-                  : 'bg-slate-950/60 border-slate-800 hover:border-slate-700 opacity-70 hover:opacity-100'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center gap-1.5">
-                  <Radio className="w-4 h-4 text-red-400" />
-                  <span className="font-bold text-slate-100 text-xs font-mono">ADMIN MODE</span>
-                </div>
-                {selectedRole === 'ADMIN' && (
-                  <CheckCircle2 className="w-4 h-4 text-red-400" />
-                )}
-              </div>
-              <p className="text-[10px] font-mono text-slate-400 leading-snug">
-                Campus Dispatcher / Security. Command Center, SLA &amp; Triage.
-              </p>
-            </div>
+            <p className="text-[10px] font-mono text-slate-400 leading-snug">
+              Afifa Only. Full RBAC Authority &amp; Tactical Dispatch.
+            </p>
           </div>
         </div>
 
-        {/* Clerk & Social Logins (Google / Gmail & GitHub) */}
+        {/* Explanatory RBAC Alert */}
+        {selectedRole === 'ADMIN' ? (
+          <div className="p-3 rounded-xl bg-red-950/30 border border-red-500/30 text-[11px] font-mono text-red-300 flex items-start gap-2">
+            <Crown className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+            <div>
+              <strong>SUPER ADMIN AFIFA ACCESS:</strong> Single administrative authority. Signs in via Google (<strong>afifasyed06@gmail.com</strong>) or admin credentials.
+            </div>
+          </div>
+        ) : (
+          <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-[11px] font-mono text-slate-400 flex items-center gap-2">
+            <Info className="w-4 h-4 text-cyan-400 shrink-0" />
+            <span>Campus users can register or sign in with Google seamlessly.</span>
+          </div>
+        )}
+
+        {/* Social Authentication (Google / Gmail & GitHub) */}
         <div className="space-y-2">
           <button
             type="button"
             id="btn-google-login"
             onClick={() => handleSocialAuth('google')}
             disabled={loading || !!socialLoading}
-            className="w-full py-2.5 px-4 rounded-xl bg-slate-950/90 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 font-mono text-xs font-semibold flex items-center justify-center gap-2.5 transition-all shadow-md"
+            className={`w-full py-2.5 px-4 rounded-xl bg-slate-950/90 hover:bg-slate-900 border text-slate-200 font-mono text-xs font-semibold flex items-center justify-center gap-2.5 transition-all shadow-md ${
+              selectedRole === 'ADMIN'
+                ? 'border-red-500/40 hover:border-red-400 text-red-200'
+                : 'border-slate-800 hover:border-slate-700'
+            }`}
           >
             {socialLoading === 'google' ? (
               <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
@@ -343,24 +345,11 @@ function LoginContent() {
                 <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
               </svg>
             )}
-            <span>CONTINUE WITH GOOGLE / GMAIL ({selectedRole})</span>
-          </button>
-
-          <button
-            type="button"
-            id="btn-github-login"
-            onClick={() => handleSocialAuth('github')}
-            disabled={loading || !!socialLoading}
-            className="w-full py-2.5 px-4 rounded-xl bg-slate-950/90 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 font-mono text-xs font-semibold flex items-center justify-center gap-2.5 transition-all shadow-md"
-          >
-            {socialLoading === 'github' ? (
-              <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
-            ) : (
-              <svg className="w-4 h-4 fill-current text-slate-300" viewBox="0 0 24 24">
-                <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
-              </svg>
-            )}
-            <span>CONTINUE WITH GITHUB ({selectedRole})</span>
+            <span>
+              {selectedRole === 'ADMIN'
+                ? 'SIGN IN WITH GOOGLE AS SUPER ADMIN'
+                : 'CONTINUE WITH GOOGLE (CAMPUS USER)'}
+            </span>
           </button>
         </div>
 
@@ -368,9 +357,41 @@ function LoginContent() {
         <div className="relative flex items-center justify-center my-2">
           <div className="border-t border-slate-800 w-full" />
           <span className="bg-slate-900/90 px-2.5 text-[10px] text-slate-500 font-mono shrink-0">
-            OR USE CAMPUS CALLSIGN &amp; PASSWORD
+            OR USE CREDENTIALS
           </span>
         </div>
+
+        {/* Mode Switch Tabs (Only relevant for User Mode) */}
+        {selectedRole === 'USER' && (
+          <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-slate-950/90 border border-slate-800 font-mono text-xs">
+            <button
+              type="button"
+              id="tab-signup"
+              onClick={() => switchMode('signup')}
+              className={`py-2 rounded-lg tracking-wider font-semibold flex items-center justify-center gap-2 transition-all ${
+                mode === 'signup'
+                  ? 'bg-gradient-to-r from-cyan-600 to-cyan-500 text-white shadow-md shadow-cyan-600/30'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>1. SIGN UP (NEW USER)</span>
+            </button>
+            <button
+              type="button"
+              id="tab-signin"
+              onClick={() => switchMode('signin')}
+              className={`py-2 rounded-lg tracking-wider font-semibold flex items-center justify-center gap-2 transition-all ${
+                mode === 'signin'
+                  ? 'bg-gradient-to-r from-cyan-600 to-cyan-500 text-white shadow-md shadow-cyan-600/30'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Lock className="w-3.5 h-3.5" />
+              <span>2. SIGN IN</span>
+            </button>
+          </div>
+        )}
 
         {/* Global Error Notice */}
         {error && (
@@ -385,9 +406,9 @@ function LoginContent() {
         )}
 
         <AnimatePresence mode="wait">
-          {mode === 'signup' ? (
+          {mode === 'signup' && selectedRole === 'USER' ? (
             /* ========================================================
-               SIGN UP FORM
+               ENDLESS USER REGISTRATION FORM
                ======================================================== */
             <motion.form
               key="signup"
@@ -406,7 +427,7 @@ function LoginContent() {
                     id="signup-first-name"
                     type="text"
                     required
-                    placeholder="Jane"
+                    placeholder="Alex"
                     value={suFirstName}
                     onChange={(e) => setSuFirstName(e.target.value)}
                     className="w-full px-3 py-2 rounded-lg bg-slate-950/80 border border-slate-800 text-slate-100 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40 transition-colors"
@@ -418,7 +439,7 @@ function LoginContent() {
                     id="signup-last-name"
                     type="text"
                     required
-                    placeholder="Doe"
+                    placeholder="Reynolds"
                     value={suLastName}
                     onChange={(e) => setSuLastName(e.target.value)}
                     className="w-full px-3 py-2 rounded-lg bg-slate-950/80 border border-slate-800 text-slate-100 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40 transition-colors"
@@ -426,9 +447,9 @@ function LoginContent() {
                 </div>
               </div>
 
-              {/* Username */}
+              {/* Username / Callsign */}
               <div>
-                <label className="block text-slate-300 mb-1">USERNAME / CALLSIGN</label>
+                <label className="block text-slate-300 mb-1">CAMPUS USERNAME</label>
                 <div className="relative">
                   <User className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
                   <input
@@ -437,7 +458,7 @@ function LoginContent() {
                     required
                     minLength={3}
                     maxLength={32}
-                    placeholder="callsign or student id"
+                    placeholder="username or student id"
                     value={suUsername}
                     onChange={(e) => setSuUsername(e.target.value)}
                     className="w-full pl-9 pr-3 py-2 rounded-lg bg-slate-950/80 border border-slate-800 text-slate-100 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40 transition-colors"
@@ -447,7 +468,7 @@ function LoginContent() {
 
               {/* Email */}
               <div>
-                <label className="block text-slate-300 mb-1">CAMPUS EMAIL</label>
+                <label className="block text-slate-300 mb-1">EMAIL ADDRESS</label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
                   <input
@@ -511,26 +532,6 @@ function LoginContent() {
                 </div>
               </div>
 
-              {/* Admin Passcode for Admin Mode */}
-              {selectedRole === 'ADMIN' && (
-                <div className="p-3 rounded-xl bg-red-950/20 border border-red-500/30 space-y-1">
-                  <div className="flex items-center gap-1.5 text-red-400 font-bold">
-                    <KeyRound className="w-3.5 h-3.5" />
-                    <span>ADMIN AUTHORIZATION CODE (OPTIONAL FOR DEMO)</span>
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="SENTINEL-ADMIN-2026 (Optional)"
-                    value={adminAuthKey}
-                    onChange={(e) => setAdminAuthKey(e.target.value)}
-                    className="w-full px-3 py-1.5 rounded-lg bg-slate-950 border border-red-500/30 text-slate-100 text-xs focus:outline-none focus:border-red-400"
-                  />
-                  {fieldErrors.adminKey && (
-                    <p className="text-[10px] text-red-400">{fieldErrors.adminKey}</p>
-                  )}
-                </div>
-              )}
-
               {/* Submit Button */}
               <motion.button
                 whileHover={{ scale: 1.01 }}
@@ -538,27 +539,23 @@ function LoginContent() {
                 type="submit"
                 id="btn-signup-submit"
                 disabled={loading}
-                className={`w-full py-3 rounded-xl font-bold tracking-wider flex items-center justify-center gap-2 transition-all shadow-lg ${
-                  selectedRole === 'ADMIN'
-                    ? 'bg-gradient-to-r from-red-600 to-red-500 text-white shadow-red-600/25 hover:from-red-500 hover:to-red-400'
-                    : 'bg-gradient-to-r from-cyan-600 to-cyan-500 text-white shadow-cyan-600/25 hover:from-cyan-500 hover:to-cyan-400'
-                }`}
+                className="w-full py-3 rounded-xl font-bold tracking-wider flex items-center justify-center gap-2 transition-all shadow-lg bg-gradient-to-r from-cyan-600 to-cyan-500 text-white shadow-cyan-600/25 hover:from-cyan-500 hover:to-cyan-400"
               >
                 {loading ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>PROVISIONING ACCOUNT...</span>
+                    <span>CREATING ACCOUNT...</span>
                   </>
                 ) : (
                   <>
                     <UserPlus className="w-4 h-4" />
-                    <span>REGISTER AS {selectedRole} &amp; ENTER</span>
+                    <span>JOIN AS CAMPUS USER &amp; ENTER</span>
                   </>
                 )}
               </motion.button>
 
               <div className="text-center text-[11px] text-slate-400 pt-1">
-                Already have an account?{' '}
+                Already registered?{' '}
                 <button
                   type="button"
                   onClick={() => switchMode('signin')}
@@ -570,7 +567,7 @@ function LoginContent() {
             </motion.form>
           ) : (
             /* ========================================================
-               SIGN IN FORM
+               SIGN IN FORM (FOR AFIFA ADMIN OR EXISTING USER)
                ======================================================== */
             <motion.form
               key="signin"
@@ -582,14 +579,16 @@ function LoginContent() {
               className="space-y-4 text-xs font-mono"
             >
               <div>
-                <label className="block text-slate-300 mb-1.5 font-bold">USERNAME OR CAMPUS EMAIL</label>
+                <label className="block text-slate-300 mb-1.5 font-bold">
+                  {selectedRole === 'ADMIN' ? 'SUPER ADMIN CALLSIGN OR EMAIL' : 'USERNAME OR CAMPUS EMAIL'}
+                </label>
                 <div className="relative">
                   <User className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
                   <input
                     id="signin-username"
                     type="text"
                     required
-                    placeholder="Enter your callsign or email"
+                    placeholder={selectedRole === 'ADMIN' ? 'afifa or afifasyed06@gmail.com' : 'username or email'}
                     autoComplete="username"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
@@ -628,7 +627,11 @@ function LoginContent() {
                 type="submit"
                 id="btn-signin-submit"
                 disabled={loading}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 disabled:opacity-60 text-white font-bold tracking-wider flex items-center justify-center gap-2 transition-all shadow-lg shadow-cyan-600/25"
+                className={`w-full py-3 rounded-xl font-bold tracking-wider flex items-center justify-center gap-2 transition-all shadow-lg ${
+                  selectedRole === 'ADMIN'
+                    ? 'bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white shadow-red-600/25'
+                    : 'bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 text-white shadow-cyan-600/25'
+                }`}
               >
                 {loading ? (
                   <>
@@ -647,39 +650,47 @@ function LoginContent() {
               <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800/80 space-y-2 text-[11px]">
                 <div className="text-slate-300 font-bold flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>PRE-SEEDED DEMO CREDENTIALS:</span>
+                  <span>PRE-CONFIGURED RBAC CREDENTIALS:</span>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => fillQuickDemo('admin')}
-                    className="p-2 rounded-lg bg-red-950/30 border border-red-500/30 hover:border-red-400 text-left transition-colors group"
+                    className="p-2.5 rounded-lg bg-red-950/30 border border-red-500/30 hover:border-red-400 text-left transition-colors group"
                   >
-                    <div className="text-red-400 font-bold group-hover:text-red-300">ADMIN MODE</div>
-                    <div className="text-slate-400 text-[10px]">admin / Admin@12345</div>
+                    <div className="text-red-400 font-bold group-hover:text-red-300 flex items-center gap-1">
+                      <Crown className="w-3 h-3 text-red-400" />
+                      <span>SUPER ADMIN (AFIFA)</span>
+                    </div>
+                    <div className="text-slate-400 text-[10px]">afifa / Admin@12345</div>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => fillQuickDemo('user')}
-                    className="p-2 rounded-lg bg-cyan-950/30 border border-cyan-500/30 hover:border-cyan-400 text-left transition-colors group"
+                    className="p-2.5 rounded-lg bg-cyan-950/30 border border-cyan-500/30 hover:border-cyan-400 text-left transition-colors group"
                   >
-                    <div className="text-cyan-400 font-bold group-hover:text-cyan-300">USER MODE</div>
+                    <div className="text-cyan-400 font-bold group-hover:text-cyan-300 flex items-center gap-1">
+                      <Shield className="w-3 h-3 text-cyan-400" />
+                      <span>CAMPUS USER (ALEX)</span>
+                    </div>
                     <div className="text-slate-400 text-[10px]">campus_user / User@12345</div>
                   </button>
                 </div>
               </div>
 
-              <div className="text-center text-[11px] text-slate-400 pt-1">
-                Need to create an account first?{' '}
-                <button
-                  type="button"
-                  onClick={() => switchMode('signup')}
-                  className="text-cyan-400 hover:underline font-bold"
-                >
-                  Sign up here
-                </button>
-              </div>
+              {selectedRole === 'USER' && (
+                <div className="text-center text-[11px] text-slate-400 pt-1">
+                  Need to create an account?{' '}
+                  <button
+                    type="button"
+                    onClick={() => switchMode('signup')}
+                    className="text-cyan-400 hover:underline font-bold"
+                  >
+                    Sign up here
+                  </button>
+                </div>
+              )}
             </motion.form>
           )}
         </AnimatePresence>
