@@ -120,12 +120,12 @@ export default function ProfilePage() {
                 }`}
               >
                 <span className={`w-1.5 h-1.5 rounded-full ${isAdmin ? 'bg-red-400 animate-pulse' : 'bg-cyan-400'}`} />
-                {isAdmin ? 'SUPER ADMIN (AFIFA)' : 'CAMPUS USER (ROLE_USER)'}
+                {isAdmin ? `SUPER ADMIN (${displayName.split(' ')[0].toUpperCase()})` : 'CAMPUS USER (ROLE_USER)'}
               </span>
             </div>
             <p className="text-xs font-mono text-slate-400">
               CALLSIGN: <strong className="text-slate-200">@{session?.username || 'member'}</strong> •{' '}
-              <span className="text-slate-400">{session?.email || 'afifasyed06@gmail.com'}</span>
+              <span className="text-slate-400">{session?.email || 'not signed in'}</span>
             </p>
             <p className="text-[11px] font-mono text-slate-500">
               Clearance Level:{' '}

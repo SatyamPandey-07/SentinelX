@@ -86,7 +86,7 @@ export function Navbar() {
         </div>
 
         <div className="flex items-center gap-2 text-slate-300 bg-black/40 px-3 py-1.5 rounded-lg border border-white/[0.06]">
-          <span>CLEARANCE: <strong className={isAdmin ? 'text-red-400' : 'text-cyan-400'}>{isAdmin ? 'SUPER ADMIN (AFIFA)' : 'CAMPUS MEMBER'}</strong></span>
+          <span>CLEARANCE: <strong className={isAdmin ? 'text-red-400' : 'text-cyan-400'}>{isAdmin ? `SUPER ADMIN (${displayName.split(' ')[0].toUpperCase()})` : 'CAMPUS MEMBER'}</strong></span>
         </div>
       </div>
 

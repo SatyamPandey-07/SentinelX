@@ -305,7 +305,7 @@ function LoginContent() {
               {selectedRole === 'ADMIN' && <CheckCircle2 className="w-4 h-4 text-red-400" />}
             </div>
             <p className="text-[10px] font-mono text-slate-400 leading-snug">
-              Afifa Only. Full RBAC Authority &amp; Tactical Dispatch.
+              Named Super Admins only. Full RBAC Authority &amp; Tactical Dispatch.
             </p>
           </div>
         </div>
@@ -315,7 +315,7 @@ function LoginContent() {
           <div className="p-3 rounded-xl bg-red-950/30 border border-red-500/30 text-[11px] font-mono text-red-300 flex items-start gap-2">
             <Crown className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
             <div>
-              <strong>SUPER ADMIN AFIFA ACCESS:</strong> Single administrative authority. Signs in via Google (<strong>afifasyed06@gmail.com</strong>) or admin credentials.
+              <strong>SUPER ADMIN ACCESS:</strong> Restricted to named administrative accounts. Sign in with your admin credentials or an authorized Google account.
             </div>
           </div>
         ) : (
