@@ -77,9 +77,11 @@ const EMERGENCY_NUMBERS = [
   { name: '24/7 Campus Crisis Hotline', number: '+1 (555) 911-0004', ext: 'Ext. 5558', role: 'Confidential mental health & safety' },
 ];
 
+import { getSharedIncidents, saveSharedIncident, IncidentRecord } from '@/lib/incident-store';
+
 export default function UserPortalPage() {
   const [session, setSession] = useState<AuthSession | null>(null);
-  const [incidents, setIncidents] = useState<UserIncident[]>(INITIAL_USER_INCIDENTS);
+  const [incidents, setIncidents] = useState<IncidentRecord[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
 
@@ -92,10 +94,23 @@ export default function UserPortalPage() {
   const [floor, setFloor] = useState('2nd Floor, Room 204');
 
   useEffect(() => {
-    setSession(getSession());
+    const curSession = getSession();
+    setSession(curSession);
+
+    const syncIncidents = () => {
+      const all = getSharedIncidents();
+      setIncidents(all);
+    };
+    syncIncidents();
+
     const onAuthChange = () => setSession(getSession());
     window.addEventListener('sentinelx_auth_change', onAuthChange);
-    return () => window.removeEventListener('sentinelx_auth_change', onAuthChange);
+    window.addEventListener('sentinelx_incidents_updated', syncIncidents);
+
+    return () => {
+      window.removeEventListener('sentinelx_auth_change', onAuthChange);
+      window.removeEventListener('sentinelx_incidents_updated', syncIncidents);
+    };
   }, []);
 
   const handleReportSubmit = (e: React.FormEvent) => {
@@ -104,46 +119,65 @@ export default function UserPortalPage() {
 
     setTimeout(() => {
       const newId = `INC-2026-${Math.floor(1000 + Math.random() * 9000)}`;
-      const newReport: UserIncident = {
+      const newReport: IncidentRecord = {
         id: newId,
+        reporter_id: session?.user_id || session?.username || 'usr-campus',
+        reporter_name: session?.first_name ? `${session.first_name} ${session.last_name}` : (session?.username || 'Campus Reporter'),
         title,
         description,
-        category,
+        category: category as any,
         severity,
         status: severity === 'CRITICAL' ? 'ASSIGNED' : 'REPORTED',
-        building,
-        floor,
-        reportedAt: 'Just now',
-        assignedResponder: severity === 'CRITICAL' ? 'Unit #R-104 (Rapid Paramedic)' : 'Dispatch Triage Queue',
-        etaMinutes: severity === 'CRITICAL' ? 3 : 6,
+        location: {
+          latitude: 37.7749,
+          longitude: -122.4194,
+          building,
+          floor,
+          zone_id: 'ZONE_NORTH',
+          address: 'Campus Quad',
+        },
+        sla_ack_deadline: new Date(Date.now() + 1000 * 300).toISOString(),
+        created_at: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        assigned_responder_id: severity === 'CRITICAL' ? 'R-104' : undefined,
+        assigned_responder_name: severity === 'CRITICAL' ? 'Paramedic Unit #R-104 (Marcus Vance)' : undefined,
       };
 
-      setIncidents([newReport, ...incidents]);
+      saveSharedIncident(newReport);
       setSubmitting(false);
       setSuccessToast(`Emergency Incident ${newId} received! SentinelX Dispatch and nearest responders have been alerted.`);
       setTitle('');
       setDescription('');
 
       setTimeout(() => setSuccessToast(null), 6000);
-    }, 600);
+    }, 500);
   };
 
   const handleSos = () => {
     const sosId = `SOS-${Math.floor(1000 + Math.random() * 9000)}`;
-    const sosIncident: UserIncident = {
+    const sosIncident: IncidentRecord = {
       id: sosId,
+      reporter_id: session?.user_id || session?.username || 'usr-campus',
+      reporter_name: session?.first_name ? `${session.first_name} ${session.last_name}` : (session?.username || 'Campus Reporter'),
       title: '🚨 IMMEDIATE PANIC / SOS SIGNAL ACTIVATED',
       description: 'Instant distress signal triggered by campus community reporter. GPS telemetry broadcast to campus police and nearest patrol units.',
       category: 'SECURITY',
       severity: 'CRITICAL',
       status: 'ASSIGNED',
-      building: 'Current GPS Geofence (Engineering Quad)',
-      floor: 'Outdoor Beacon #12',
-      reportedAt: 'Just now',
-      assignedResponder: 'Armed Campus Patrol #P-02 & Paramedic Unit #R-104',
-      etaMinutes: 1,
+      location: {
+        latitude: 37.7749,
+        longitude: -122.4194,
+        building: 'Current GPS Geofence (Engineering Quad)',
+        floor: 'Outdoor Beacon #12',
+        zone_id: 'ZONE_NORTH',
+        address: 'Campus Central Quad',
+      },
+      sla_ack_deadline: new Date(Date.now() + 1000 * 60).toISOString(),
+      created_at: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      assigned_responder_id: 'R-104',
+      assigned_responder_name: 'Armed Campus Patrol #P-02 & Paramedic Unit #R-104',
     };
-    setIncidents([sosIncident, ...incidents]);
+
+    saveSharedIncident(sosIncident);
     setSuccessToast(`SOS SIGNAL BROADCAST! Tactical dispatch units and security patrols are en route.`);
     setTimeout(() => setSuccessToast(null), 7000);
   };
@@ -397,17 +431,15 @@ export default function UserPortalPage() {
                   <div className="pt-1 flex items-center justify-between text-[10px] font-mono text-slate-400 border-t border-slate-800/60">
                     <div className="flex items-center gap-1">
                       <MapPin className="w-3 h-3 text-slate-500" />
-                      <span>{item.building}</span>
+                      <span>{item.location?.building || (item as any).building || 'Campus Quad'}</span>
                     </div>
-                    <span>{item.reportedAt}</span>
+                    <span>{item.created_at || (item as any).reportedAt || 'Just now'}</span>
                   </div>
 
-                  {item.assignedResponder && (
+                  {(item.assigned_responder_name || (item as any).assignedResponder) && (
                     <div className="p-2 rounded-lg bg-cyan-950/30 border border-cyan-500/30 text-[10px] font-mono text-cyan-300 flex items-center justify-between">
-                      <span>Assigned: {item.assignedResponder}</span>
-                      {item.etaMinutes !== undefined && item.etaMinutes > 0 && (
-                        <span className="text-amber-400 font-bold">ETA: ~{item.etaMinutes}m</span>
-                      )}
+                      <span>Assigned: {item.assigned_responder_name || (item as any).assignedResponder}</span>
+                      <span className="text-emerald-400 font-bold">READY</span>
                     </div>
                   )}
                 </div>
