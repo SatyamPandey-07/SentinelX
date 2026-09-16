@@ -41,13 +41,26 @@ spring:
             name: Access-Control-Allow-Origin Access-Control-Allow-Credentials Access-Control-Allow-Methods Access-Control-Allow-Headers Vary
             strategy: RETAIN_FIRST
       routes:
-        # Auth Service Route
+        # Auth Service Route -- strictest limit of any route (Section 43:
+        # "stricter limits for authentication") since login/register is
+        # exactly what credential-stuffing and brute-force target, and
+        # there's no JWT yet to key on, so this is IP-keyed.
         - id: auth-service-route
           uri: ${AUTH_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/api/v1/auth/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 5
+                redis-rate-limiter.burstCapacity: 10
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@ipKeyResolver}"
 
-        # Incident Service Route
+        # Incident Service Route -- this is the emergency-reporting path,
+        # so the limit is deliberately generous (Section 43: "Emergency
+        # reporting must remain available while preventing abuse") and
+        # keyed per-user-or-IP rather than a single shared bucket.
         - id: incident-service-route
           uri: ${INCIDENT_SERVICE_URL:http://localhost:8082}
           predicates:
@@ -57,38 +70,85 @@ spring:
               args:
                 name: incidentCircuitBreaker
                 fallbackUri: forward:/fallback/incidents
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 20
+                redis-rate-limiter.burstCapacity: 40
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@userOrIpKeyResolver}"
 
         # Location Service Route
         - id: location-service-route
           uri: ${LOCATION_SERVICE_URL:http://localhost:8084}
           predicates:
             - Path=/api/v1/location/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 15
+                redis-rate-limiter.burstCapacity: 30
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@userOrIpKeyResolver}"
 
         # Search Service Route
         - id: search-service-route
           uri: ${SEARCH_SERVICE_URL:http://localhost:8086}
           predicates:
             - Path=/api/v1/search/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 15
+                redis-rate-limiter.burstCapacity: 30
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@userOrIpKeyResolver}"
 
         # Analytics Service Route
         - id: analytics-service-route
           uri: ${ANALYTICS_SERVICE_URL:http://localhost:8089}
           predicates:
             - Path=/api/v1/analytics/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 10
+                redis-rate-limiter.burstCapacity: 20
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@userOrIpKeyResolver}"
 
         # Audit Service Route
         - id: audit-service-route
           uri: ${AUDIT_SERVICE_URL:http://localhost:8090}
           predicates:
             - Path=/api/v1/audit/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 10
+                redis-rate-limiter.burstCapacity: 20
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@userOrIpKeyResolver}"
 
-        # AI & RAG Service Route
+        # AI & RAG Service Route -- tightest non-auth limit: each request
+        # triggers an LLM call, the most expensive downstream operation in
+        # the whole system.
         - id: ai-service-route
           uri: ${AI_SERVICE_URL:http://localhost:8000}
           predicates:
             - Path=/api/v1/ai/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 5
+                redis-rate-limiter.burstCapacity: 10
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@userOrIpKeyResolver}"
 
-        # Realtime WebSocket STOMP Route
+        # Realtime WebSocket STOMP Route -- deliberately NOT rate-limited
+        # via RequestRateLimiter: this is a single long-lived connection
+        # upgrade per client, not a stream of discrete HTTP requests, so a
+        # per-request token bucket doesn't model it. Reconnect storms are
+        # bounded by realtime-service's own STOMP session limits instead.
         - id: realtime-service-route
           uri: ${REALTIME_SERVICE_URL:http://localhost:8087}
           predicates:
