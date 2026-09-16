@@ -25,6 +25,21 @@ spring:
               - OPTIONS
             allowedHeaders: "*"
             allowCredentials: true
+      # auth-service also sets its own CORS headers (defense in depth for
+      # the case it's reached directly, bypassing the gateway) -- Spring
+      # Cloud Gateway proxies a downstream response's headers through
+      # as-is, so without this, a request routed through the gateway got
+      # BOTH the gateway's and auth-service's Access-Control-* headers on
+      # the same response. Browsers reject a response with more than one
+      # value on Access-Control-Allow-Origin even when both are identical
+      # (reproduced live: "The 'Access-Control-Allow-Origin' header
+      # contains multiple values ... but only one is allowed", which
+      # silently broke every browser-based login through the gateway).
+      default-filters:
+        - name: DedupeResponseHeader
+          args:
+            name: Access-Control-Allow-Origin Access-Control-Allow-Credentials Access-Control-Allow-Methods Access-Control-Allow-Headers Vary
+            strategy: RETAIN_FIRST
       routes:
         # Auth Service Route
         - id: auth-service-route
