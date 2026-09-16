@@ -21,25 +21,55 @@ export interface RegisterPayload {
   phone?: string;
 }
 
-// RBAC Configuration: Afifa is the single Super Admin
-export const SUPER_ADMIN_EMAILS = [
-  'afifasyed06@gmail.com',
-  'afifa@sentinelx.local',
-  'admin@sentinelx.local',
+// RBAC Configuration: named Super Admins, each with their own identity.
+// A super admin is recognized by email OR username matching their entry
+// below; whichever one matched, their session gets normalized to their
+// real name/userId (see resolveSuperAdminIdentity).
+interface SuperAdminProfile {
+  userId: string;
+  username: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+}
+
+export const SUPER_ADMINS: SuperAdminProfile[] = [
+  { userId: 'usr-superadmin-afifa', username: 'Afifa', firstName: 'Afifa', lastName: 'Syed', email: 'afifasyed06@gmail.com' },
+  { userId: 'usr-superadmin-satyam', username: 'Satyam', firstName: 'Satyam', lastName: 'Pandey', email: 'pandeysatyam1802@gmail.com' },
 ];
 
-export const SUPER_ADMIN_USERNAMES = [
-  'afifa',
-  'admin',
-];
+// The generic 'admin' / 'admin@sentinelx.local' login (also the backend's
+// seeded demo account) has always resolved to Afifa's identity -- kept as
+// an alias rather than a third distinct admin.
+const GENERIC_ADMIN_ALIAS_EMAILS = ['afifa@sentinelx.local', 'admin@sentinelx.local'];
+const GENERIC_ADMIN_ALIAS_USERNAMES = ['admin'];
+
+export const SUPER_ADMIN_EMAILS = [...SUPER_ADMINS.map((a) => a.email), ...GENERIC_ADMIN_ALIAS_EMAILS];
+export const SUPER_ADMIN_USERNAMES = [...SUPER_ADMINS.map((a) => a.username.toLowerCase()), ...GENERIC_ADMIN_ALIAS_USERNAMES];
 
 /**
- * Checks whether an email or username belongs to Super Admin Afifa.
+ * Looks up which named Super Admin an email/username belongs to, if any.
+ * The generic 'admin' alias resolves to Afifa's profile.
+ */
+export function resolveSuperAdminIdentity(email?: string, username?: string): SuperAdminProfile | null {
+  const e = email?.trim().toLowerCase();
+  const u = username?.trim().toLowerCase();
+
+  const named = SUPER_ADMINS.find((a) => (e && a.email.toLowerCase() === e) || (u && a.username.toLowerCase() === u));
+  if (named) return named;
+
+  if ((e && GENERIC_ADMIN_ALIAS_EMAILS.includes(e)) || (u && GENERIC_ADMIN_ALIAS_USERNAMES.includes(u))) {
+    return SUPER_ADMINS[0]; // Afifa
+  }
+
+  return null;
+}
+
+/**
+ * Checks whether an email or username belongs to any Super Admin.
  */
 export function isSuperAdmin(email?: string, username?: string): boolean {
-  if (email && SUPER_ADMIN_EMAILS.includes(email.trim().toLowerCase())) return true;
-  if (username && SUPER_ADMIN_USERNAMES.includes(username.trim().toLowerCase())) return true;
-  return false;
+  return resolveSuperAdminIdentity(email, username) !== null;
 }
 
 /**
@@ -50,9 +80,10 @@ export function formatDisplayName(
 ): string {
   if (!user) return 'Guest';
 
-  // If this is Super Admin Afifa
-  if (isSuperAdmin(user.email, user.username)) {
-    return 'Afifa Syed';
+  // If this is a named Super Admin, always show their real name
+  const superAdmin = resolveSuperAdminIdentity(user.email, user.username);
+  if (superAdmin) {
+    return `${superAdmin.firstName} ${superAdmin.lastName}`;
   }
 
   // If first name exists and is not an auto-generated placeholder
@@ -77,7 +108,6 @@ export function formatDisplayName(
 
   // Derive human-readable name from email
   if (user.email) {
-    if (user.email.toLowerCase() === 'afifasyed06@gmail.com') return 'Afifa Syed';
     const handle = user.email.split('@')[0];
     return handle
       .replace(/[._-]/g, ' ')
@@ -114,6 +144,19 @@ const PRESEEDED_USERS: Record<string, { password: string; session: AuthSession }
       email: 'afifasyed06@gmail.com',
     },
   },
+  satyam: {
+    password: 'Admin@12345',
+    session: {
+      access_token: 'mock-jwt-satyam-superadmin-token',
+      refresh_token: 'mock-jwt-satyam-refresh-token',
+      username: 'Satyam',
+      role: 'ROLE_ADMIN',
+      user_id: 'usr-superadmin-satyam',
+      first_name: 'Satyam',
+      last_name: 'Pandey',
+      email: 'pandeysatyam1802@gmail.com',
+    },
+  },
   campus_user: {
     password: 'User@12345',
     session: {
@@ -146,17 +189,18 @@ export function getSession(): AuthSession | null {
     const email = parsed.email;
     const username = parsed.username || 'Operator';
 
-    // Auto-escalate if it's Super Admin Afifa
-    const effectiveRole: UserRole = isSuperAdmin(email, username) ? 'ROLE_ADMIN' : role;
+    // Auto-escalate if it's a named Super Admin
+    const superAdmin = resolveSuperAdminIdentity(email, username);
+    const effectiveRole: UserRole = superAdmin ? 'ROLE_ADMIN' : role;
 
     return {
       access_token: token,
       refresh_token: localStorage.getItem(REFRESH_TOKEN_KEY) || '',
-      username: isSuperAdmin(email, username) ? 'Afifa' : username,
+      username: superAdmin ? superAdmin.username : username,
       role: effectiveRole,
       user_id: parsed.userId || parsed.user_id || 'usr-default',
-      first_name: isSuperAdmin(email, username) ? 'Afifa' : (parsed.firstName || parsed.first_name),
-      last_name: isSuperAdmin(email, username) ? 'Syed' : (parsed.lastName || parsed.last_name),
+      first_name: superAdmin ? superAdmin.firstName : (parsed.firstName || parsed.first_name),
+      last_name: superAdmin ? superAdmin.lastName : (parsed.lastName || parsed.last_name),
       email,
     };
   } catch {
@@ -167,11 +211,11 @@ export function getSession(): AuthSession | null {
 export function persistSession(session: AuthSession): void {
   if (typeof window === 'undefined') return;
 
-  const isAfifa = isSuperAdmin(session.email, session.username);
-  const cleanUsername = isAfifa ? 'Afifa' : (session.username.startsWith('google_user_') ? (session.first_name || 'Member') : session.username);
-  const cleanFirstName = isAfifa ? 'Afifa' : (session.first_name?.includes('Google') ? 'Campus' : session.first_name);
-  const cleanLastName = isAfifa ? 'Syed' : (session.last_name?.includes('User') ? 'Member' : session.last_name);
-  const enforcedRole: UserRole = isAfifa ? 'ROLE_ADMIN' : session.role;
+  const superAdmin = resolveSuperAdminIdentity(session.email, session.username);
+  const cleanUsername = superAdmin ? superAdmin.username : (session.username.startsWith('google_user_') ? (session.first_name || 'Member') : session.username);
+  const cleanFirstName = superAdmin ? superAdmin.firstName : (session.first_name?.includes('Google') ? 'Campus' : session.first_name);
+  const cleanLastName = superAdmin ? superAdmin.lastName : (session.last_name?.includes('User') ? 'Member' : session.last_name);
+  const enforcedRole: UserRole = superAdmin ? 'ROLE_ADMIN' : session.role;
 
   localStorage.setItem(TOKEN_KEY, session.access_token);
   localStorage.setItem(REFRESH_TOKEN_KEY, session.refresh_token);
@@ -201,9 +245,9 @@ export function switchRole(newRole: UserRole): AuthSession | null {
   const current = getSession();
   if (!current) return null;
 
-  // Strict RBAC: Only Super Admin Afifa can switch to ROLE_ADMIN
+  // Strict RBAC: Only a named Super Admin can switch to ROLE_ADMIN
   if (newRole === 'ROLE_ADMIN' && !isSuperAdmin(current.email, current.username)) {
-    throw new Error('Access Denied: Only Super Admin Afifa has administrative clearance.');
+    throw new Error('Access Denied: Only a Super Admin has administrative clearance.');
   }
 
   const updated: AuthSession = { ...current, role: newRole };
@@ -249,14 +293,14 @@ export function getRBACUserDirectory(): Array<{
     role: UserRole;
     isSuperAdmin: boolean;
   }> = [
-    {
-      userId: 'usr-superadmin-afifa',
-      username: 'Afifa',
-      email: 'afifasyed06@gmail.com',
-      name: 'Afifa Syed',
-      role: 'ROLE_ADMIN',
+    ...SUPER_ADMINS.map((a) => ({
+      userId: a.userId,
+      username: a.username,
+      email: a.email,
+      name: `${a.firstName} ${a.lastName}`,
+      role: 'ROLE_ADMIN' as UserRole,
       isSuperAdmin: true,
-    },
+    })),
     {
       userId: 'usr-user-002',
       username: 'campus_user',
@@ -285,12 +329,12 @@ export function getRBACUserDirectory(): Array<{
 }
 
 /**
- * Super Admin Afifa can update another user's role (RBAC Delegation).
+ * A Super Admin can update another user's role (RBAC Delegation).
  */
 export function updateDelegatedUserRole(targetEmailOrUsername: string, newRole: UserRole): boolean {
   const current = getSession();
   if (!current || !isSuperAdmin(current.email, current.username)) {
-    throw new Error('Only Super Admin Afifa has authority to delegate roles.');
+    throw new Error('Only a Super Admin has authority to delegate roles.');
   }
 
   const localUsers = getLocalRegisteredUsers();
@@ -330,16 +374,17 @@ export async function authenticate(usernameOrEmail: string, password: string): P
     }
 
     const backendRole = data.role.startsWith('ROLE_') ? data.role : `ROLE_${data.role}`;
-    const effectiveRole: UserRole = isSuperAdmin(data.email, data.username) ? 'ROLE_ADMIN' : backendRole;
+    const loginSuperAdmin = resolveSuperAdminIdentity(data.email, data.username);
+    const effectiveRole: UserRole = loginSuperAdmin ? 'ROLE_ADMIN' : backendRole;
 
     const session: AuthSession = {
       access_token: data.access_token,
       refresh_token: data.refresh_token,
-      username: isSuperAdmin(data.email, data.username) ? 'Afifa' : data.username,
+      username: loginSuperAdmin ? loginSuperAdmin.username : data.username,
       role: effectiveRole,
       user_id: data.user_id,
-      first_name: isSuperAdmin(data.email, data.username) ? 'Afifa' : data.first_name,
-      last_name: isSuperAdmin(data.email, data.username) ? 'Syed' : data.last_name,
+      first_name: loginSuperAdmin ? loginSuperAdmin.firstName : data.first_name,
+      last_name: loginSuperAdmin ? loginSuperAdmin.lastName : data.last_name,
       email: data.email,
     };
     persistSession(session);
@@ -365,11 +410,12 @@ export async function authenticate(usernameOrEmail: string, password: string): P
 
   // Ensure RBAC integrity
   const session = { ...foundUser.session };
-  if (isSuperAdmin(session.email, session.username)) {
+  const fallbackSuperAdmin = resolveSuperAdminIdentity(session.email, session.username);
+  if (fallbackSuperAdmin) {
     session.role = 'ROLE_ADMIN';
-    session.username = 'Afifa';
-    session.first_name = 'Afifa';
-    session.last_name = 'Syed';
+    session.username = fallbackSuperAdmin.username;
+    session.first_name = fallbackSuperAdmin.firstName;
+    session.last_name = fallbackSuperAdmin.lastName;
   }
 
   persistSession(session);
@@ -379,9 +425,9 @@ export async function authenticate(usernameOrEmail: string, password: string): P
 export async function registerUser(payload: RegisterPayload): Promise<AuthSession> {
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
 
-  // Strict RBAC: All endless users are strictly ROLE_USER. Only Afifa can be ROLE_ADMIN.
-  const isAfifa = isSuperAdmin(payload.email, payload.username);
-  const assignedRole: UserRole = isAfifa ? 'ROLE_ADMIN' : 'ROLE_USER';
+  // Strict RBAC: All endless users are strictly ROLE_USER. Only a named Super Admin can be ROLE_ADMIN.
+  const regSuperAdmin = resolveSuperAdminIdentity(payload.email, payload.username);
+  const assignedRole: UserRole = regSuperAdmin ? 'ROLE_ADMIN' : 'ROLE_USER';
 
   // 1. Try real backend API first
   try {
@@ -398,7 +444,7 @@ export async function registerUser(payload: RegisterPayload): Promise<AuthSessio
         first_name: payload.first_name,
         last_name: payload.last_name,
         phone: payload.phone || '+10000000000',
-        role: isAfifa ? 'ADMIN' : 'USER',
+        role: regSuperAdmin ? 'ADMIN' : 'USER',
       }),
       signal: controller.signal,
     });
@@ -416,11 +462,11 @@ export async function registerUser(payload: RegisterPayload): Promise<AuthSessio
     const session: AuthSession = {
       access_token: data.access_token,
       refresh_token: data.refresh_token,
-      username: isAfifa ? 'Afifa' : data.username,
+      username: regSuperAdmin ? regSuperAdmin.username : data.username,
       role: assignedRole,
       user_id: data.user_id,
-      first_name: isAfifa ? 'Afifa' : payload.first_name,
-      last_name: isAfifa ? 'Syed' : payload.last_name,
+      first_name: regSuperAdmin ? regSuperAdmin.firstName : payload.first_name,
+      last_name: regSuperAdmin ? regSuperAdmin.lastName : payload.last_name,
       email: payload.email,
     };
     persistSession(session);
@@ -442,11 +488,11 @@ export async function registerUser(payload: RegisterPayload): Promise<AuthSessio
   const newSession: AuthSession = {
     access_token: `mock-jwt-${payload.username}-${Date.now()}`,
     refresh_token: `mock-refresh-${payload.username}-${Date.now()}`,
-    username: isAfifa ? 'Afifa' : payload.username,
+    username: regSuperAdmin ? regSuperAdmin.username : payload.username,
     role: assignedRole,
     user_id: `usr-${Date.now().toString(36)}`,
-    first_name: isAfifa ? 'Afifa' : payload.first_name,
-    last_name: isAfifa ? 'Syed' : payload.last_name,
+    first_name: regSuperAdmin ? regSuperAdmin.firstName : payload.first_name,
+    last_name: regSuperAdmin ? regSuperAdmin.lastName : payload.last_name,
     email: payload.email,
   };
 
