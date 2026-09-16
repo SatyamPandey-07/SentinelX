@@ -92,15 +92,14 @@ export default function AuditTrailPage() {
                 <span className="px-2.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold uppercase border border-cyan-500/30">
                   {log.action}
                 </span>
-                <span className="text-slate-400">RESOURCE: {log.resource_type} // {log.resource_id}</span>
+                <span className="text-slate-400">ENTITY: {log.entity_id}</span>
               </div>
-              <span className="text-slate-400 text-[11px]">{new Date(log.occurred_at).toLocaleTimeString()} UTC</span>
+              <span className="text-slate-400 text-[11px]">{log.timestamp}</span>
             </div>
 
-            {/* Principal & Role */}
+            {/* Actor */}
             <div className="flex items-center gap-4 text-[11px] text-slate-400">
-              <span>PRINCIPAL: <strong className="text-slate-200">{log.principal_id}</strong></span>
-              <span>ROLE: <strong className="text-purple-300">{log.principal_role}</strong></span>
+              <span>ACTOR: <strong className="text-slate-200">{log.actor}</strong></span>
             </div>
 
             {/* Cryptographic Hash Chain Badges */}
@@ -113,7 +112,7 @@ export default function AuditTrailPage() {
               <div className="flex items-center gap-2 text-cyan-300">
                 <Hash className="w-3 h-3 text-cyan-400 shrink-0" />
                 <span>CURR HASH:</span>
-                <span className="font-bold truncate text-slate-200">{log.curr_hash}</span>
+                <span className="font-bold truncate text-slate-200">{log.current_hash}</span>
                 <span className="text-[9px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 ml-auto shrink-0 border border-emerald-500/30">
                   SIGNED
                 </span>
