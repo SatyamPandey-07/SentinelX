@@ -39,6 +39,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
+  if (!authReady) {
+    return <div className="bg-background min-h-screen" />;
+  }
+
   return (
     <div className="bg-background text-slate-100 min-h-screen flex flex-col">
       <Navbar />
