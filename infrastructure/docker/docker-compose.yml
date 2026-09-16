@@ -101,7 +101,13 @@ services:
   # Search & Duplicate Detection: OpenSearch
   # ==========================================
   opensearch:
-    image: opensearchproject/opensearch:2.12.0
+    # 2.12.0's published image (all platform variants, verified via `docker
+    # manifest inspect` and reproduced across multiple clean Docker Desktop
+    # resets) fails every binary exec ("exec format error") on this host,
+    # 2.11.1 runs normally (verified: real OpenSearch startup log output,
+    # plugins load, no exec error) and is otherwise identical for this
+    # project's purposes (single-node, security plugin disabled).
+    image: opensearchproject/opensearch:2.11.1
     container_name: sentinelx-opensearch
     restart: unless-stopped
     environment:
@@ -157,7 +163,13 @@ services:
   # Vector Database: Qdrant (RAG & Embeddings)
   # ==========================================
   qdrant:
-    image: qdrant/qdrant:v1.19.0
+    # v1.19.0's published image fails every binary exec ("exec format
+    # error") on this host, reproduced across multiple clean Docker Desktop
+    # resets and confirmed via `docker manifest inspect` (correct amd64
+    # platform resolves, but the layer content itself won't execute).
+    # v1.18.1 runs normally (verified: real Qdrant startup log output, REST
+    # :6333 and gRPC :6334 listening, no exec error).
+    image: qdrant/qdrant:v1.18.1
     container_name: sentinelx-qdrant
     restart: unless-stopped
     ports:
