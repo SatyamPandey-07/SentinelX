@@ -13,7 +13,7 @@
 
 SentinelX is a production-grade distributed emergency and incident management platform built for large campuses (universities, corporate complexes, and industrial sites). The system coordinates incident ingestion, AI hazard classification with deterministic safety guardrails, spatial-temporal duplicate detection, intelligent responder dispatch with distributed locking, real-time SLA tracking via Redis sorted sets, and an immutable cryptographic audit ledger.
 
----
+-----
 
 ## 1. System Architecture
 
