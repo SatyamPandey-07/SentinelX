@@ -27,7 +27,7 @@
         <bouncycastle.version>1.78.1</bouncycastle.version>
         <micrometer.version>1.13.4</micrometer.version>
         <opentelemetry.version>1.41.0</opentelemetry.version>
-        <testcontainers.version>1.20.1</testcontainers.version>
+        <testcontainers.version>1.20.4</testcontainers.version>
     </properties>
 
     <modules>
