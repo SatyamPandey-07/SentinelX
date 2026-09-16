@@ -303,6 +303,31 @@ export function getAnalyticsOverview() {
 }
 
 // ---------------------------------------------------------------------
+// AI / RAG (ai-service, routed through the gateway at /api/v1/ai/**)
+// ---------------------------------------------------------------------
+
+export interface RagCitation {
+  document_name: string;
+  section: string;
+  content: string;
+  relevance_score: number;
+}
+
+export interface RagQueryResponse {
+  answer: string;
+  citations: RagCitation[];
+  confidence: number;
+  disclaimer: string;
+}
+
+export function queryRag(query: string, incidentCategory?: string) {
+  return request<RagQueryResponse>('/api/v1/ai/rag/query', {
+    method: 'POST',
+    body: JSON.stringify({ query, incident_category: incidentCategory, max_citations: 3 }),
+  });
+}
+
+// ---------------------------------------------------------------------
 // System health -- each service exposes its own actuator on its own
 // mapped host port; the browser hits them directly rather than through
 // the gateway (there's no gateway route for bare /actuator per service).

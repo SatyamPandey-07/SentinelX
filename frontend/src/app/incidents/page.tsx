@@ -1,79 +1,104 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { 
-  Search, 
-  Filter, 
-  Plus, 
-  Flame, 
-  Clock, 
-  MapPin, 
-  ChevronRight, 
-  ShieldAlert, 
-  CheckCircle2, 
+import {
+  Search,
+  Plus,
+  Flame,
+  MapPin,
+  ChevronRight,
   X,
   Layers,
   Database,
-  Radio
+  Loader2,
+  AlertTriangle,
 } from 'lucide-react';
-import { MOCK_INCIDENTS, Incident } from '@/lib/mock-data';
+import { listIncidents, createIncident, Incident, IncidentCategory, IncidentSeverity, ApiError } from '@/lib/api';
+
+const CATEGORIES: IncidentCategory[] = [
+  'FIRE', 'MEDICAL', 'SECURITY', 'HAZMAT', 'INFRASTRUCTURE', 'ELECTRICAL',
+  'SUSPICIOUS_ACTIVITY', 'HARASSMENT', 'THEFT', 'NATURAL_DISASTER', 'EQUIPMENT_FAILURE', 'OTHER',
+];
 
 export default function IncidentsPage() {
-  const [incidents, setIncidents] = useState<Incident[]>(MOCK_INCIDENTS);
+  const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSeverity, setSelectedSeverity] = useState<string>('ALL');
-  const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Form state
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('FIRE');
-  const [severity, setSeverity] = useState('HIGH');
+  const [category, setCategory] = useState<IncidentCategory>('FIRE');
+  const [severity, setSeverity] = useState<IncidentSeverity>('HIGH');
   const [building, setBuilding] = useState('Science & Chemistry Hall');
   const [floor, setFloor] = useState('2nd Floor');
 
-  const filtered = incidents.filter(i => {
+  const load = useCallback(async () => {
+    try {
+      const page = await listIncidents({ size: 100 });
+      setIncidents(page.content);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Unable to reach incident-service');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+    const poll = setInterval(load, 10000);
+    return () => clearInterval(poll);
+  }, [load]);
+
+  const filtered = incidents.filter((i) => {
     if (selectedSeverity !== 'ALL' && i.severity !== selectedSeverity) return false;
-    if (selectedStatus !== 'ALL' && i.status !== selectedStatus) return false;
     if (searchQuery.trim() !== '') {
       const q = searchQuery.toLowerCase();
-      const match = i.title.toLowerCase().includes(q) ||
-                    i.description.toLowerCase().includes(q) ||
-                    i.location.building.toLowerCase().includes(q) ||
-                    i.id.toLowerCase().includes(q);
+      const match =
+        i.title.toLowerCase().includes(q) ||
+        i.description.toLowerCase().includes(q) ||
+        (i.location.building ?? '').toLowerCase().includes(q) ||
+        i.id.toLowerCase().includes(q);
       if (!match) return false;
     }
     return true;
   });
 
-  const handleCreateIncident = (e: React.FormEvent) => {
+  const handleCreateIncident = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newInc: Incident = {
-      id: `INC-2026-${Math.floor(1000 + Math.random() * 9000)}`,
-      reporter_id: "usr-current",
-      title,
-      description,
-      category: category as any,
-      severity: severity as any,
-      status: "REPORTED",
-      location: {
-        latitude: 37.7749,
-        longitude: -122.4194,
-        building,
-        floor,
-        zone_id: "ZONE_NORTH",
-        address: "Campus Ground"
-      },
-      sla_ack_deadline: new Date(Date.now() + 1000 * 300).toISOString(),
-      created_at: new Date().toISOString()
-    };
-
-    setIncidents([newInc, ...incidents]);
-    setIsReportModalOpen(false);
-    setTitle('');
-    setDescription('');
+    setSubmitting(true);
+    setFormError(null);
+    try {
+      const created = await createIncident({
+        title,
+        description,
+        category,
+        severity,
+        location: {
+          latitude: 37.7749,
+          longitude: -122.4194,
+          building,
+          floor,
+          zone_id: 'ZONE_NORTH',
+          address: 'Campus Ground',
+        },
+      });
+      setIncidents((prev) => [created, ...prev]);
+      setIsReportModalOpen(false);
+      setTitle('');
+      setDescription('');
+    } catch (e) {
+      setFormError(e instanceof ApiError ? e.message : 'Failed to submit incident');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -84,11 +109,11 @@ export default function IncidentsPage() {
           <h1 className="text-xl font-bold tracking-tight text-slate-100 flex items-center gap-2.5 font-mono uppercase">
             <span>INCIDENT QUEUE &amp; TRIAGE</span>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-cyan-300 font-mono border border-slate-700">
-              {filtered.length} ACTIVE
+              {filtered.length} LOADED
             </span>
           </h1>
           <p className="text-xs text-slate-400 font-mono mt-1">
-            POSTGRESQL TRANSACTIONAL OUTBOX // OPENSEARCH DUP SCANNER ACTIVE
+            LIVE FROM POSTGRESQL VIA incident-service (AI classification runs async, on-page reload)
           </p>
         </div>
 
@@ -101,11 +126,15 @@ export default function IncidentsPage() {
         </button>
       </div>
 
-      {/* ========================================================
-          BENTO FILTER & TELEMETRY ROW
-          ======================================================== */}
+      {error && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-mono">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+          {error}
+        </div>
+      )}
+
+      {/* Filter & Telemetry Row */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-        {/* Bento Control 1: Query & Filter Console (Col Span 6) */}
         <div className="md:col-span-12 lg:col-span-6 bento-card flex flex-col justify-between">
           <div className="space-y-3">
             <span className="text-[11px] font-mono tracking-widest text-slate-300 uppercase font-bold flex items-center gap-1.5">
@@ -131,8 +160,8 @@ export default function IncidentsPage() {
                 key={s}
                 onClick={() => setSelectedSeverity(s)}
                 className={`px-2 py-0.5 rounded text-[10px] transition-colors ${
-                  selectedSeverity === s 
-                    ? 'bg-cyan-500 text-slate-950 font-bold' 
+                  selectedSeverity === s
+                    ? 'bg-cyan-500 text-slate-950 font-bold'
                     : 'bg-slate-800 text-slate-400 hover:text-slate-200'
                 }`}
               >
@@ -142,7 +171,6 @@ export default function IncidentsPage() {
           </div>
         </div>
 
-        {/* Bento Control 2: OpenSearch Duplicate Engine (Col Span 3) */}
         <div className="md:col-span-6 lg:col-span-3 bento-card bento-card-info flex flex-col justify-between">
           <div className="space-y-2">
             <span className="text-[11px] font-mono tracking-widest text-cyan-300 uppercase font-bold flex items-center gap-1.5">
@@ -154,11 +182,10 @@ export default function IncidentsPage() {
             </p>
           </div>
           <div className="pt-2 border-t border-cyan-950/60 text-[10px] font-mono text-cyan-400">
-            OpenSearch Cluster: Active
+            search-service / OpenSearch
           </div>
         </div>
 
-        {/* Bento Control 3: Transactional Outbox (Col Span 3) */}
         <div className="md:col-span-6 lg:col-span-3 bento-card bento-card-success flex flex-col justify-between">
           <div className="space-y-2">
             <span className="text-[11px] font-mono tracking-widest text-emerald-300 uppercase font-bold flex items-center gap-1.5">
@@ -170,18 +197,26 @@ export default function IncidentsPage() {
             </p>
           </div>
           <div className="pt-2 border-t border-emerald-950/60 text-[10px] font-mono text-emerald-400">
-            Pending Outbox: 0 events
+            incident-service outbox_events
           </div>
         </div>
       </div>
 
-      {/* ========================================================
-          INCIDENT BENTO STREAM
-          ======================================================== */}
+      {/* Incident Stream */}
+      {loading ? (
+        <div className="flex items-center justify-center py-16 text-slate-400 font-mono text-sm gap-2">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          LOADING INCIDENTS...
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="bento-card text-center py-12 text-slate-400 font-mono text-sm">
+          No incidents match. {incidents.length === 0 && 'Report one to get started.'}
+        </div>
+      ) : (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {filtered.map((incident) => {
           const isCritical = incident.severity === 'CRITICAL';
-          const isResolved = incident.status === 'RESOLVED';
+          const isResolved = incident.status === 'RESOLVED' || incident.status === 'CLOSED';
 
           return (
             <div
@@ -193,7 +228,7 @@ export default function IncidentsPage() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-black text-slate-300">{incident.id}</span>
+                    <span className="text-xs font-mono font-black text-slate-300">{incident.id.slice(0, 8)}</span>
                     <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold uppercase ${
                       incident.severity === 'CRITICAL' ? 'bg-red-500/20 text-red-400 border border-red-500/40' :
                       incident.severity === 'HIGH' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40' :
@@ -207,7 +242,7 @@ export default function IncidentsPage() {
                   </div>
 
                   <span className={`text-[10px] px-2 py-0.5 rounded font-mono ${
-                    incident.status === 'RESOLVED' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+                    incident.status === 'RESOLVED' || incident.status === 'CLOSED' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
                     incident.status === 'ASSIGNED' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30' :
                     'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                   }`}>
@@ -224,7 +259,7 @@ export default function IncidentsPage() {
               <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] font-mono text-slate-400 flex-wrap gap-2">
                 <span className="flex items-center gap-1.5 text-slate-300">
                   <MapPin className="w-3.5 h-3.5 text-cyan-400" />
-                  {incident.location.building} // {incident.location.floor}
+                  {incident.location.building || 'No building'} {incident.location.floor && `// ${incident.location.floor}`}
                 </span>
 
                 <Link
@@ -239,6 +274,7 @@ export default function IncidentsPage() {
           );
         })}
       </div>
+      )}
 
       {/* Incident Modal */}
       {isReportModalOpen && (
@@ -284,21 +320,17 @@ export default function IncidentsPage() {
                   <label className="text-slate-400 block mb-1">CATEGORY</label>
                   <select
                     value={category}
-                    onChange={(e) => setCategory(e.target.value)}
+                    onChange={(e) => setCategory(e.target.value as IncidentCategory)}
                     className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-slate-100"
                   >
-                    <option value="FIRE">FIRE</option>
-                    <option value="MEDICAL">MEDICAL</option>
-                    <option value="SECURITY">SECURITY</option>
-                    <option value="INFRASTRUCTURE">INFRASTRUCTURE</option>
-                    <option value="HAZMAT">HAZMAT</option>
+                    {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="text-slate-400 block mb-1">INITIAL SEVERITY</label>
                   <select
                     value={severity}
-                    onChange={(e) => setSeverity(e.target.value)}
+                    onChange={(e) => setSeverity(e.target.value as IncidentSeverity)}
                     className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-slate-100"
                   >
                     <option value="CRITICAL">CRITICAL</option>
@@ -308,6 +340,34 @@ export default function IncidentsPage() {
                   </select>
                 </div>
               </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-400 block mb-1">BUILDING</label>
+                  <input
+                    type="text"
+                    value={building}
+                    onChange={(e) => setBuilding(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-slate-100 focus:outline-none focus:border-red-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-slate-400 block mb-1">FLOOR</label>
+                  <input
+                    type="text"
+                    value={floor}
+                    onChange={(e) => setFloor(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-slate-100 focus:outline-none focus:border-red-500"
+                  />
+                </div>
+              </div>
+
+              {formError && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  {formError}
+                </div>
+              )}
 
               <div className="pt-3 border-t border-slate-800 flex justify-end gap-2">
                 <button
@@ -319,8 +379,10 @@ export default function IncidentsPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold"
+                  disabled={submitting}
+                  className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white font-bold flex items-center gap-2"
                 >
+                  {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   DISPATCH INCIDENT
                 </button>
               </div>
