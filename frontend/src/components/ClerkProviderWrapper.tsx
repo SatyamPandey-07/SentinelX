@@ -1,7 +1,8 @@
 'use client';
 
-import React, { createContext, useContext } from 'react';
-import { ClerkProvider } from '@clerk/nextjs';
+import React, { createContext, useContext, useEffect } from 'react';
+import { ClerkProvider, useUser } from '@clerk/nextjs';
+import { persistSession, getSession, isSuperAdmin, AuthSession } from '@/lib/auth';
 
 const PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 const CLERK_CONFIGURED = Boolean(
@@ -10,13 +11,45 @@ const CLERK_CONFIGURED = Boolean(
 
 const ClerkConfiguredContext = createContext(false);
 
-// Components that render Clerk's own UI (SignedIn/SignedOut/UserButton)
-// must check this before rendering the real Clerk components -- those
-// throw "can only be used within a <ClerkProvider>" if mounted while
-// ClerkProviderWrapper has taken the no-key fallback path below. See
-// ClerkGate.tsx for the drop-in-safe versions that check it for you.
 export function useClerkConfigured() {
   return useContext(ClerkConfiguredContext);
+}
+
+// Automatically bridges Clerk OAuth login sessions into SentinelX's local AuthSession
+function ClerkSessionSync() {
+  const { user, isLoaded } = useUser();
+
+  useEffect(() => {
+    if (!isLoaded || !user) return;
+
+    const email = user.primaryEmailAddress?.emailAddress?.toLowerCase() || '';
+    const usernameCandidate = user.username || '';
+    const isSuper = isSuperAdmin(email, usernameCandidate);
+
+    const pendingRole = typeof window !== 'undefined' ? localStorage.getItem('sentinelx_pending_role') : null;
+    const assignedRole = (isSuper || pendingRole === 'ROLE_ADMIN') ? 'ROLE_ADMIN' : 'ROLE_USER';
+
+    const cleanUsername = isSuper ? 'Afifa' : (user.username || user.firstName || email.split('@')[0] || 'campus_user');
+    const firstName = isSuper ? 'Afifa' : (user.firstName || 'Campus');
+    const lastName = isSuper ? 'Syed' : (user.lastName || 'Member');
+
+    const cur = getSession();
+    if (!cur || cur.access_token.startsWith('clerk-token-')) {
+      const session: AuthSession = {
+        access_token: `clerk-token-${user.id}`,
+        refresh_token: `clerk-refresh-${user.id}`,
+        username: cleanUsername,
+        role: assignedRole,
+        user_id: user.id,
+        first_name: firstName,
+        last_name: lastName,
+        email: user.primaryEmailAddress?.emailAddress || (isSuper ? 'afifasyed06@gmail.com' : `${cleanUsername}@campus.edu`),
+      };
+      persistSession(session);
+    }
+  }, [user, isLoaded]);
+
+  return null;
 }
 
 export function ClerkProviderWrapper({ children }: { children: React.ReactNode }) {
@@ -24,6 +57,7 @@ export function ClerkProviderWrapper({ children }: { children: React.ReactNode }
     return (
       <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
         <ClerkConfiguredContext.Provider value={true}>
+          <ClerkSessionSync />
           {children}
         </ClerkConfiguredContext.Provider>
       </ClerkProvider>
