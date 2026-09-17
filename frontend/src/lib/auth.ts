@@ -391,7 +391,16 @@ export async function authenticate(usernameOrEmail: string, password: string): P
     return session;
   } catch (apiErr: unknown) {
     const errMessage = apiErr instanceof Error ? apiErr.message : '';
-    if (errMessage && errMessage !== 'Failed to fetch' && !errMessage.includes('aborted')) {
+    const localUsers = getLocalRegisteredUsers();
+    const fallbackCandidate =
+      PRESEEDED_USERS[identifier] ||
+      Object.values(PRESEEDED_USERS).find((u) => u.session.email?.toLowerCase() === identifier) ||
+      localUsers[identifier] ||
+      Object.values(localUsers).find((u) => u.session.email?.toLowerCase() === identifier);
+
+    if (fallbackCandidate && fallbackCandidate.password === password) {
+      // Gracefully fall through to preseeded/local user session
+    } else if (errMessage && errMessage !== 'Failed to fetch' && !errMessage.includes('aborted')) {
       throw new Error(errMessage);
     }
   }

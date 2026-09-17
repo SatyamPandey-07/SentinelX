@@ -23,7 +23,7 @@ import {
   Info,
 } from 'lucide-react';
 import { authenticate, registerUser, persistSession, AuthSession, isSuperAdmin, SUPER_ADMINS } from '@/lib/auth';
-import { useSafeSignIn } from '@/components/ClerkGate';
+import { useSafeAuth } from '@/components/ClerkGate';
 
 type ViewMode = 'signup' | 'signin';
 type RoleChoice = 'USER' | 'ADMIN';
@@ -141,21 +141,39 @@ function LoginContent() {
     }
   };
 
-  const { signIn, bridge: clerkSignInBridge } = useSafeSignIn();
+  const { signIn, signUp, bridge: clerkAuthBridge } = useSafeAuth();
 
   // Clean Social Login (Google / Gmail & GitHub)
   const handleSocialAuth = async (provider: 'google' | 'github') => {
     setSocialLoading(provider);
     setError(null);
 
-    // If Clerk signIn is loaded, trigger Clerk OAuth redirect
+    const targetRedirect = selectedRole === 'ADMIN' ? '/dashboard' : '/user';
+    localStorage.setItem('sentinelx_pending_role', selectedRole === 'ADMIN' ? 'ROLE_ADMIN' : 'ROLE_USER');
+    const strategy = provider === 'google' ? 'oauth_google' : 'oauth_github';
+
+    // 1. In signup mode, try signUp flow first
+    if (mode === 'signup' && signUp) {
+      try {
+        await signUp.authenticateWithRedirect({
+          strategy,
+          redirectUrl: '/sso-callback',
+          redirectUrlComplete: targetRedirect,
+        });
+        return;
+      } catch (signUpErr) {
+        console.warn('Clerk signUp redirect failed, falling back to signIn:', signUpErr);
+      }
+    }
+
+    // 2. In signin mode (or signup fallback), try signIn with continueSignUp so new users are auto-transferred without bouncing
     if (signIn) {
       try {
-        localStorage.setItem('sentinelx_pending_role', selectedRole === 'ADMIN' ? 'ROLE_ADMIN' : 'ROLE_USER');
         await signIn.authenticateWithRedirect({
-          strategy: provider === 'google' ? 'oauth_google' : 'oauth_github',
+          strategy,
           redirectUrl: '/sso-callback',
-          redirectUrlComplete: selectedRole === 'ADMIN' ? '/dashboard' : '/user',
+          redirectUrlComplete: targetRedirect,
+          continueSignUp: true,
         });
         return;
       } catch (clerkErr) {
@@ -220,7 +238,7 @@ function LoginContent() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-[#060911]">
-      {clerkSignInBridge}
+      {clerkAuthBridge}
       {/* Tactical Glow Elements */}
       <div className="absolute inset-0 opacity-[0.25] bg-[radial-gradient(#38bdf8_1px,transparent_1px)] [background-size:26px_26px]" />
       <motion.div
