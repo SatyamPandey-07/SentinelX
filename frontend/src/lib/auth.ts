@@ -173,9 +173,20 @@ const PRESEEDED_USERS: Record<string, { password: string; session: AuthSession }
 };
 
 const LOCAL_USERS_KEY = 'sentinelx_registered_users';
+const DELEGATED_ROLES_KEY = 'sentinelx_delegated_roles';
 const TOKEN_KEY = 'sentinelx_token';
 const REFRESH_TOKEN_KEY = 'sentinelx_refresh_token';
 const USER_KEY = 'sentinelx_user';
+
+export function getDelegatedRoles(): Record<string, UserRole> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(DELEGATED_ROLES_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
 
 export function getSession(): AuthSession | null {
   if (typeof window === 'undefined') return null;
@@ -189,9 +200,11 @@ export function getSession(): AuthSession | null {
     const email = parsed.email;
     const username = parsed.username || 'Operator';
 
-    // Auto-escalate if it's a named Super Admin
+    // Auto-escalate if it's a named Super Admin or has delegated role
     const superAdmin = resolveSuperAdminIdentity(email, username);
-    const effectiveRole: UserRole = superAdmin ? 'ROLE_ADMIN' : role;
+    const delegated = getDelegatedRoles();
+    const delegatedRole = (username && delegated[username.toLowerCase()]) || (email && delegated[email.toLowerCase()]);
+    const effectiveRole: UserRole = superAdmin ? 'ROLE_ADMIN' : (delegatedRole || role);
 
     return {
       access_token: token,
@@ -212,10 +225,12 @@ export function persistSession(session: AuthSession): void {
   if (typeof window === 'undefined') return;
 
   const superAdmin = resolveSuperAdminIdentity(session.email, session.username);
+  const delegated = getDelegatedRoles();
+  const delegatedRole = (session.username && delegated[session.username.toLowerCase()]) || (session.email && delegated[session.email.toLowerCase()]);
   const cleanUsername = superAdmin ? superAdmin.username : (session.username.startsWith('google_user_') ? (session.first_name || 'Member') : session.username);
   const cleanFirstName = superAdmin ? superAdmin.firstName : (session.first_name?.includes('Google') ? 'Campus' : session.first_name);
   const cleanLastName = superAdmin ? superAdmin.lastName : (session.last_name?.includes('User') ? 'Member' : session.last_name);
-  const enforcedRole: UserRole = superAdmin ? 'ROLE_ADMIN' : session.role;
+  const enforcedRole: UserRole = superAdmin ? 'ROLE_ADMIN' : (delegatedRole || session.role);
 
   localStorage.setItem(TOKEN_KEY, session.access_token);
   localStorage.setItem(REFRESH_TOKEN_KEY, session.refresh_token);
@@ -285,6 +300,18 @@ export function getRBACUserDirectory(): Array<{
   isSuperAdmin: boolean;
 }> {
   const localUsers = getLocalRegisteredUsers();
+  const delegated = getDelegatedRoles();
+
+  const getEffectiveRole = (email?: string, username?: string, defaultRole: UserRole = 'ROLE_USER'): UserRole => {
+    const isAf = isSuperAdmin(email, username);
+    if (isAf) return 'ROLE_ADMIN';
+    const e = email?.toLowerCase();
+    const u = username?.toLowerCase();
+    if (u && delegated[u]) return delegated[u];
+    if (e && delegated[e]) return delegated[e];
+    return defaultRole;
+  };
+
   const list: Array<{
     userId: string;
     username: string;
@@ -306,7 +333,7 @@ export function getRBACUserDirectory(): Array<{
       username: 'campus_user',
       email: 'user@campus.edu',
       name: 'Alex Reynolds',
-      role: 'ROLE_USER',
+      role: getEffectiveRole('user@campus.edu', 'campus_user', 'ROLE_USER'),
       isSuperAdmin: false,
     },
   ];
@@ -319,7 +346,7 @@ export function getRBACUserDirectory(): Array<{
         username: u.session.username,
         email: u.session.email || `${u.session.username}@campus.edu`,
         name: formatDisplayName(u.session),
-        role: isAf ? 'ROLE_ADMIN' : u.session.role,
+        role: getEffectiveRole(u.session.email, u.session.username, isAf ? 'ROLE_ADMIN' : u.session.role),
         isSuperAdmin: isAf,
       });
     }
@@ -331,24 +358,67 @@ export function getRBACUserDirectory(): Array<{
 /**
  * A Super Admin can update another user's role (RBAC Delegation).
  */
-export function updateDelegatedUserRole(targetEmailOrUsername: string, newRole: UserRole): boolean {
+export function updateDelegatedUserRole(
+  targetEmailOrUsername: string,
+  newRole: UserRole,
+  secondaryIdentifier?: string
+): boolean {
   const current = getSession();
   if (!current || !isSuperAdmin(current.email, current.username)) {
     throw new Error('Only a Super Admin has authority to delegate roles.');
   }
 
-  const localUsers = getLocalRegisteredUsers();
-  const key = targetEmailOrUsername.toLowerCase();
+  const delegated = getDelegatedRoles();
+  const key1 = targetEmailOrUsername.toLowerCase();
+  delegated[key1] = newRole;
 
-  for (const [k, u] of Object.entries(localUsers)) {
-    if (k === key || u.session.email?.toLowerCase() === key || u.session.username.toLowerCase() === key) {
-      localUsers[k].session.role = newRole;
-      localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(localUsers));
-      return true;
+  if (secondaryIdentifier) {
+    delegated[secondaryIdentifier.toLowerCase()] = newRole;
+  }
+
+  // Cross-reference preseeded campus user
+  if (
+    key1 === 'campus_user' ||
+    key1 === 'user@campus.edu' ||
+    secondaryIdentifier?.toLowerCase() === 'user@campus.edu' ||
+    secondaryIdentifier?.toLowerCase() === 'campus_user'
+  ) {
+    delegated['campus_user'] = newRole;
+    delegated['user@campus.edu'] = newRole;
+    if (PRESEEDED_USERS['campus_user']) {
+      PRESEEDED_USERS['campus_user'].session.role = newRole;
     }
   }
 
-  return false;
+  localStorage.setItem(DELEGATED_ROLES_KEY, JSON.stringify(delegated));
+
+  const localUsers = getLocalRegisteredUsers();
+  for (const [k, u] of Object.entries(localUsers)) {
+    const match =
+      k === key1 ||
+      u.session.email?.toLowerCase() === key1 ||
+      u.session.username.toLowerCase() === key1 ||
+      (secondaryIdentifier &&
+        (u.session.email?.toLowerCase() === secondaryIdentifier.toLowerCase() ||
+          u.session.username.toLowerCase() === secondaryIdentifier.toLowerCase()));
+    if (match) {
+      localUsers[k].session.role = newRole;
+      localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(localUsers));
+    }
+  }
+
+  if (
+    current.username.toLowerCase() === key1 ||
+    current.email?.toLowerCase() === key1 ||
+    (secondaryIdentifier &&
+      (current.username.toLowerCase() === secondaryIdentifier.toLowerCase() ||
+        current.email?.toLowerCase() === secondaryIdentifier.toLowerCase()))
+  ) {
+    persistSession({ ...current, role: newRole });
+  }
+
+  window.dispatchEvent(new Event('sentinelx_auth_change'));
+  return true;
 }
 
 export async function authenticate(usernameOrEmail: string, password: string): Promise<AuthSession> {

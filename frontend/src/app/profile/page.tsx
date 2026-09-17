@@ -52,7 +52,7 @@ export default function ProfilePage() {
   >([]);
   const [delegationSuccess, setDelegationSuccess] = useState<string | null>(null);
 
-  useEffect(() => {
+  const refreshProfileData = () => {
     const cur = getSession();
     setSession(cur);
     if (cur) {
@@ -67,6 +67,19 @@ export default function ProfilePage() {
         setUserDirectory(getRBACUserDirectory());
       }
     }
+  };
+
+  useEffect(() => {
+    refreshProfileData();
+
+    const handleAuthChange = () => {
+      refreshProfileData();
+    };
+
+    window.addEventListener('sentinelx_auth_change', handleAuthChange);
+    return () => {
+      window.removeEventListener('sentinelx_auth_change', handleAuthChange);
+    };
   }, []);
 
   const isAdmin =
@@ -79,9 +92,9 @@ export default function ProfilePage() {
     router.push('/login?mode=signup');
   };
 
-  const handleRoleChange = (emailOrUsername: string, newRole: UserRole) => {
+  const handleRoleChange = (emailOrUsername: string, newRole: UserRole, secondaryEmail?: string) => {
     try {
-      updateDelegatedUserRole(emailOrUsername, newRole);
+      updateDelegatedUserRole(emailOrUsername, newRole, secondaryEmail);
       setUserDirectory(getRBACUserDirectory());
       setDelegationSuccess(`Updated clearance for ${emailOrUsername} to ${newRole}`);
       setTimeout(() => setDelegationSuccess(null), 3000);
@@ -247,7 +260,7 @@ export default function ProfilePage() {
                           {u.role === 'ROLE_USER' ? (
                             <button
                               type="button"
-                              onClick={() => handleRoleChange(u.username, 'ROLE_ADMIN')}
+                              onClick={() => handleRoleChange(u.username, 'ROLE_ADMIN', u.email)}
                               className="px-2.5 py-1 rounded-lg bg-amber-950/40 border border-amber-500/40 text-amber-300 hover:bg-amber-900/60 text-[10px] font-bold transition-all"
                             >
                               Grant Dispatcher
@@ -255,7 +268,7 @@ export default function ProfilePage() {
                           ) : (
                             <button
                               type="button"
-                              onClick={() => handleRoleChange(u.username, 'ROLE_USER')}
+                              onClick={() => handleRoleChange(u.username, 'ROLE_USER', u.email)}
                               className="px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700 text-[10px] font-bold transition-all"
                             >
                               Reset to User

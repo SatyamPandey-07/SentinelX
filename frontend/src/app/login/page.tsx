@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { authenticate, registerUser, persistSession, AuthSession, isSuperAdmin, SUPER_ADMINS } from '@/lib/auth';
 import { useSafeAuth } from '@/components/ClerkGate';
+import { useClerkConfigured } from '@/components/ClerkProviderWrapper';
 
 type ViewMode = 'signup' | 'signin';
 type RoleChoice = 'USER' | 'ADMIN';
@@ -141,7 +142,8 @@ function LoginContent() {
     }
   };
 
-  const { signIn, signUp, bridge: clerkAuthBridge } = useSafeAuth();
+  const { clerk, signIn, signUp, bridge: clerkAuthBridge } = useSafeAuth();
+  const clerkConfigured = useClerkConfigured();
 
   // Clean Social Login (Google / Gmail & GitHub)
   const handleSocialAuth = async (provider: 'google' | 'github') => {
@@ -152,43 +154,85 @@ function LoginContent() {
     localStorage.setItem('sentinelx_pending_role', selectedRole === 'ADMIN' ? 'ROLE_ADMIN' : 'ROLE_USER');
     const strategy = provider === 'google' ? 'oauth_google' : 'oauth_github';
 
-    // 1. In signup mode, try signUp flow first
-    if (mode === 'signup' && signUp) {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const redirectUrl = `${origin}/sso-callback`;
+    const redirectUrlComplete = `${origin}${targetRedirect}`;
+
+    // 1. If Clerk is configured on this deployment, trigger real OAuth redirect
+    if (clerkConfigured) {
       try {
-        await signUp.authenticateWithRedirect({
-          strategy,
-          redirectUrl: '/sso-callback',
-          redirectUrlComplete: targetRedirect,
-        });
+        let activeClerk = clerk || (typeof window !== 'undefined' ? (window as any).Clerk : null);
+
+        // Wait up to 2 seconds for Clerk to hydrate if user clicked right upon load
+        if (!activeClerk?.loaded) {
+          for (let i = 0; i < 20; i++) {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+            activeClerk = clerk || (typeof window !== 'undefined' ? (window as any).Clerk : null);
+            if (activeClerk?.loaded) break;
+          }
+        }
+
+        // Canonical top-level authenticateWithRedirect handles both sign-in & sign-up
+        if (activeClerk?.authenticateWithRedirect) {
+          try {
+            await activeClerk.authenticateWithRedirect({
+              strategy,
+              redirectUrl,
+              redirectUrlComplete,
+              continueSignUp: true,
+            });
+            return;
+          } catch (clerkErr) {
+            console.warn('Clerk top-level authenticateWithRedirect threw, attempting fallback:', clerkErr);
+          }
+        }
+
+        // Fallback to signIn with continueSignUp
+        if (signIn?.authenticateWithRedirect) {
+          try {
+            await signIn.authenticateWithRedirect({
+              strategy,
+              redirectUrl,
+              redirectUrlComplete,
+              continueSignUp: true,
+            });
+            return;
+          } catch (signInErr) {
+            console.warn('Clerk signIn.authenticateWithRedirect threw:', signInErr);
+          }
+        }
+
+        // Fallback to signUp
+        if (signUp?.authenticateWithRedirect) {
+          try {
+            await signUp.authenticateWithRedirect({
+              strategy,
+              redirectUrl,
+              redirectUrlComplete,
+            });
+            return;
+          } catch (signUpErr) {
+            console.warn('Clerk signUp.authenticateWithRedirect threw:', signUpErr);
+          }
+        }
+
+        // Real Clerk OAuth redirect failed
+        setError('Google sign-in was unable to redirect. Please disable popup/redirect blockers or authenticate using your credentials.');
+        setSocialLoading(null);
         return;
-      } catch (signUpErr) {
-        console.warn('Clerk signUp redirect failed, falling back to signIn:', signUpErr);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Google OAuth redirect failed';
+        setError(`OAuth Error: ${msg}`);
+        setSocialLoading(null);
+        return;
       }
     }
 
-    // 2. In signin mode (or signup fallback), try signIn with continueSignUp so new users are auto-transferred without bouncing
-    if (signIn) {
-      try {
-        await signIn.authenticateWithRedirect({
-          strategy,
-          redirectUrl: '/sso-callback',
-          redirectUrlComplete: targetRedirect,
-          continueSignUp: true,
-        });
-        return;
-      } catch (clerkErr) {
-        console.warn('Clerk OAuth initiated, fallback if running local mock:', clerkErr);
-      }
-    }
-
-    // High fidelity fallback simulation: Never outputs ugly `google_user_414`!
+    // 2. High fidelity fallback simulation (ONLY for offline/unconfigured CI environments without Clerk keys)
     setTimeout(() => {
       let session: AuthSession;
 
       if (selectedRole === 'ADMIN') {
-        // This is a simulated OAuth session (real Clerk auth didn't fire),
-        // so there's no real identity to resolve -- default to the first
-        // named Super Admin, same as the rest of the admin demo fallbacks.
         const admin = SUPER_ADMINS[0];
         session = {
           access_token: `oauth-superadmin-${Date.now()}`,
@@ -201,7 +245,6 @@ function LoginContent() {
           email: admin.email,
         };
       } else {
-        // Endless Campus User identity
         session = {
           access_token: `oauth-user-${Date.now()}`,
           refresh_token: `oauth-refresh-${Date.now()}`,
