@@ -65,7 +65,7 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="w-64 border-r border-white/[0.08] bg-[#080A0F] flex flex-col justify-between h-[calc(100vh-4rem)] sticky top-16">
+    <aside aria-label="Primary sidebar navigation" className="w-64 border-r border-white/[0.08] bg-[#080A0F] flex flex-col justify-between h-[calc(100vh-4rem)] sticky top-16">
       <div className="p-4 space-y-1 overflow-y-auto">
         <div className="flex items-center justify-between px-3 py-2 text-[10px] font-mono tracking-widest text-slate-500 uppercase">
           <span>{isAdmin ? 'ADMIN COMMAND MODULES' : 'USER SAFETY MODULES'}</span>
@@ -84,6 +84,8 @@ export function Sidebar() {
             <Link
               key={item.label}
               href={item.href}
+              aria-label={item.label}
+              aria-current={isActive ? 'page' : undefined}
               className={`relative flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-mono font-medium transition-colors ${
                 isActive
                   ? isAdmin ? 'text-red-300' : 'text-cyan-300'
