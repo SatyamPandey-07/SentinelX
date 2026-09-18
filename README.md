@@ -185,21 +185,29 @@ k6 run tests/load/incident_creation_load.js
 | Document | Description |
 |---|---|
 | [docs/RUNBOOK.md](docs/RUNBOOK.md) | Plain-language, zero-assumed-background guide to installing, running, and clicking through every feature and dashboard |
-| [docs/ARCHITECTURE.md](file:///d:/VIGIL/docs/ARCHITECTURE.md) | 12 complete Mermaid diagrams detailing workflows, data flows, and lifecycles |
-| [docs/DISTRIBUTED_SYSTEMS.md](file:///d:/VIGIL/docs/DISTRIBUTED_SYSTEMS.md) | In-depth breakdown of Transactional Outbox, Sagas, Distributed Locks, and CQRS |
-| [docs/CAP_THEOREM.md](file:///d:/VIGIL/docs/CAP_THEOREM.md) | Rigorous analysis of CAP theorem trade-offs across SentinelX services |
-| [docs/INTERVIEW_GUIDE.md](file:///d:/VIGIL/docs/INTERVIEW_GUIDE.md) | 26 comprehensive interview questions and technical answers for Staff/Principal roles |
-| [docs/KAFKA.md](file:///d:/VIGIL/docs/KAFKA.md) | Partition key design, consumer groups, offset management, and DLQ semantics |
-| [docs/REDIS.md](file:///d:/VIGIL/docs/REDIS.md) | Distributed mutex locking, SLA Sorted Sets, cache-aside, and rate limiting |
-| [docs/DATABASE.md](file:///d:/VIGIL/docs/DATABASE.md) | Database-per-service isolation, Flyway migrations, and geospatial indexing |
-| [docs/AI.md](file:///d:/VIGIL/docs/AI.md) | Deterministic safety guardrails, ML/LLM strategies, and duplicate scoring |
-| [docs/RAG.md](file:///d:/VIGIL/docs/RAG.md) | Qdrant vector retrieval, zero-temperature generation, and grounding verification |
-| [docs/OBSERVABILITY.md](file:///d:/VIGIL/docs/OBSERVABILITY.md) | OpenTelemetry W3C trace propagation, Prometheus metrics, and structured JSON logs |
-| [docs/SECURITY.md](file:///d:/VIGIL/docs/SECURITY.md) | JWT rotation, RBAC role matrix, rate limiting, and secret protection |
-| [docs/NETWORKING.md](file:///d:/VIGIL/docs/NETWORKING.md) | HTTP/2 gRPC vs REST, connection pooling, and socket lifecycle |
-| [docs/KUBERNETES.md](file:///d:/VIGIL/docs/KUBERNETES.md) | Production K8s manifests, HPA, readiness/liveness probes, and zero-downtime rollouts |
-| [docs/FAILURE_HANDLING.md](file:///d:/VIGIL/docs/FAILURE_HANDLING.md) | Graceful degradation matrix for broker, database, and AI outages |
-| [docs/TESTING.md](file:///d:/VIGIL/docs/TESTING.md) | Unit, integration, chaos engineering, and k6 load testing execution |
-| [docs/CI_CD.md](file:///d:/VIGIL/docs/CI_CD.md) | GitHub Actions CI/CD workflows, quality gates, and container security scanning |
-| [docs/OPERATIONS_LINUX.md](file:///d:/VIGIL/docs/OPERATIONS_LINUX.md) | Linux OS internals, JVM memory vs Cgroups, socket states, and CLI diagnostics |
-| [docs/adr/](file:///d:/VIGIL/docs/adr) | 12 Architecture Decision Records (ADR-001 through ADR-012) |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 12 complete Mermaid diagrams detailing workflows, data flows, and lifecycles |
+| [docs/DISTRIBUTED_SYSTEMS.md](docs/DISTRIBUTED_SYSTEMS.md) | In-depth breakdown of Transactional Outbox, Sagas, Distributed Locks, and CQRS |
+| [docs/CAP_THEOREM.md](docs/CAP_THEOREM.md) | Rigorous analysis of CAP theorem trade-offs across SentinelX services |
+| [docs/INTERVIEW_GUIDE.md](docs/INTERVIEW_GUIDE.md) | 26 comprehensive interview questions and technical answers for Staff/Principal roles |
+| [docs/KAFKA.md](docs/KAFKA.md) | Partition key design, consumer groups, offset management, and DLQ semantics |
+| [docs/REDIS.md](docs/REDIS.md) | Distributed mutex locking, SLA Sorted Sets, cache-aside, and rate limiting |
+| [docs/DATABASE.md](docs/DATABASE.md) | Database-per-service isolation, Flyway migrations, and geospatial indexing |
+| [docs/AI.md](docs/AI.md) | Deterministic safety guardrails, ML/LLM strategies, and duplicate scoring |
+| [docs/RAG.md](docs/RAG.md) | Qdrant vector retrieval, zero-temperature generation, and grounding verification |
+| [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md) | OpenTelemetry W3C trace propagation, Prometheus metrics, and structured JSON logs |
+| [docs/SECURITY.md](docs/SECURITY.md) | JWT rotation, RBAC role matrix, rate limiting, and secret protection |
+| [docs/NETWORKING.md](docs/NETWORKING.md) | HTTP/2 gRPC vs REST, connection pooling, and socket lifecycle |
+| [docs/KUBERNETES.md](docs/KUBERNETES.md) | Production K8s manifests, HPA, readiness/liveness probes, and zero-downtime rollouts |
+| [docs/FAILURE_HANDLING.md](docs/FAILURE_HANDLING.md) | Graceful degradation matrix for broker, database, and AI outages |
+| [docs/TESTING.md](docs/TESTING.md) | Unit, integration, chaos engineering, and k6 load testing execution |
+| [docs/CI_CD.md](docs/CI_CD.md) | GitHub Actions CI/CD workflows, quality gates, and container security scanning |
+| [docs/OPERATIONS_LINUX.md](docs/OPERATIONS_LINUX.md) | Linux OS internals, JVM memory vs Cgroups, socket states, and CLI diagnostics |
+| [docs/adr/](docs/adr/) | 12 Architecture Decision Records (ADR-001 through ADR-012) |
+
+---
+
+## 7. Local Troubleshooting
+
+- **Docker Compose Port Conflicts**: If port 5432 or 6379 is occupied by a local PostgreSQL or Redis instance, ensure local services are stopped or adjust mapping in `infrastructure/docker/docker-compose.yml`.
+- **Clerk Authentication in Dev**: If Clerk keys are unset, the frontend will automatically use local persistent session mock storage. To enable real Clerk OAuth, export `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` in `frontend/.env.local`.
+- **Maven Build Memory**: For multi-module compilation, export `MAVEN_OPTS="-Xmx2048m"` if your environment encounters Java heap space limitations.
