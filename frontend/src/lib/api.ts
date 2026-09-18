@@ -224,6 +224,9 @@ export function getMe() {
 // Incidents
 // ---------------------------------------------------------------------
 
+/**
+ * Fetches a paginated collection of incidents filtered by status, severity, or category.
+ */
 export function listIncidents(params?: { status?: string; severity?: string; category?: string; size?: number; sort?: string }) {
   const qs = new URLSearchParams();
   if (params?.status) qs.set('status', params.status);
@@ -234,10 +237,16 @@ export function listIncidents(params?: { status?: string; severity?: string; cat
   return request<Page<Incident>>(`/api/v1/incidents?${qs.toString()}`);
 }
 
+/**
+ * Fetches detailed incident data by unique incident ID.
+ */
 export function getIncident(id: string) {
   return request<Incident>(`/api/v1/incidents/${id}`);
 }
 
+/**
+ * Creates a new emergency incident record with an idempotent submission key.
+ */
 export function createIncident(input: {
   title: string;
   description: string;
@@ -252,10 +261,16 @@ export function createIncident(input: {
   });
 }
 
+/**
+ * Acknowledges an assigned incident, transitioning state to ACKNOWLEDGED.
+ */
 export function acknowledgeIncident(id: string) {
   return request<Incident>(`/api/v1/incidents/${id}/acknowledge`, { method: 'POST' });
 }
 
+/**
+ * Resolves an active incident with optional operational resolution notes.
+ */
 export function resolveIncident(id: string, notes?: string) {
   return request<Incident>(`/api/v1/incidents/${id}/resolve`, {
     method: 'POST',
