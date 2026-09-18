@@ -32,6 +32,9 @@ yarn-debug.log*
 yarn-error.log*
 .turbo
 *.tsbuildinfo
+.eslintcache
+*.next-trace
+.vercel/
 
 # Python & Pytest
 __pycache__/
