@@ -260,6 +260,7 @@ export default function ProfilePage() {
                           {u.role === 'ROLE_USER' ? (
                             <button
                               type="button"
+                              aria-label={`Grant Dispatcher clearance to ${u.username}`}
                               onClick={() => handleRoleChange(u.username, 'ROLE_ADMIN', u.email)}
                               className="px-2.5 py-1 rounded-lg bg-amber-950/40 border border-amber-500/40 text-amber-300 hover:bg-amber-900/60 text-[10px] font-bold transition-all"
                             >
@@ -268,6 +269,7 @@ export default function ProfilePage() {
                           ) : (
                             <button
                               type="button"
+                              aria-label={`Reset ${u.username} to standard Campus User clearance`}
                               onClick={() => handleRoleChange(u.username, 'ROLE_USER', u.email)}
                               className="px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700 text-[10px] font-bold transition-all"
                             >
