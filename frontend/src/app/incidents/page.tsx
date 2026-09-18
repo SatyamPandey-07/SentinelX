@@ -127,9 +127,9 @@ export default function IncidentsPage() {
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-mono">
-          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-          {error}
+        <div role="alert" aria-live="assertive" className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-mono">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+          <span>{error}</span>
         </div>
       )}
 
@@ -189,11 +189,11 @@ export default function IncidentsPage() {
               DUP DETECTION
             </span>
             <p className="text-[11px] text-slate-300">
-              Spatial proximity &le; 150m, temporal delta &le; 10m, text cosine &ge; 0.70.
+              Cosine vector similarity &gt; 0.85 alerts dispatcher to duplicate submissions.
             </p>
           </div>
           <div className="pt-2 border-t border-cyan-950/60 text-[10px] font-mono text-cyan-400">
-            search-service / OpenSearch
+            search-service / OpenSearch 2.x
           </div>
         </div>
 
@@ -215,9 +215,9 @@ export default function IncidentsPage() {
 
       {/* Incident Stream */}
       {loading ? (
-        <div className="flex items-center justify-center py-16 text-slate-400 font-mono text-sm gap-2">
-          <Loader2 className="w-4 h-4 animate-spin" />
-          LOADING INCIDENTS...
+        <div role="status" aria-live="polite" className="flex items-center justify-center py-16 text-slate-400 font-mono text-sm gap-2">
+          <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+          <span>LOADING INCIDENTS...</span>
         </div>
       ) : filtered.length === 0 ? (
         <div className="bento-card text-center py-12 text-slate-400 font-mono text-sm">
