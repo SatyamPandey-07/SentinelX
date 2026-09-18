@@ -13,6 +13,7 @@ jobs:
   build-java-services:
     name: Build & Test Java Microservices
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout Code
@@ -45,6 +46,7 @@ jobs:
   test-python-ai-service:
     name: Test AI & RAG Service
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout Code
@@ -71,6 +73,7 @@ jobs:
   build-frontend:
     name: Build Next.js Dashboard
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout Code
@@ -96,6 +99,7 @@ jobs:
     name: Container Security & Vulnerability Scan
     needs: [build-java-services, test-python-ai-service]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout Code
