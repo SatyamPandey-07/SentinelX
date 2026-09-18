@@ -1,5 +1,5 @@
 import './globals.css';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Sora, JetBrains_Mono } from 'next/font/google';
 import { AppShell } from '@/components/AppShell';
 import { ClerkProviderWrapper } from '@/components/ClerkProviderWrapper';
@@ -17,6 +17,12 @@ const jetbrainsMono = JetBrains_Mono({
   variable: '--font-mono-display',
   display: 'swap',
 });
+
+export const viewport: Viewport = {
+  themeColor: '#060911',
+  width: 'device-width',
+  initialScale: 1,
+};
 
 export const metadata: Metadata = {
   title: 'SentinelX | Distributed Emergency Operations & 3D Defense Platform',
