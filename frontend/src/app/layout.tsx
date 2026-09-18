@@ -21,6 +21,12 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: 'SentinelX | Distributed Emergency Operations & 3D Defense Platform',
   description: 'Mission-critical distributed incident response and tactical campus dispatch platform with 3D defense grid',
+  keywords: ['SentinelX', 'Emergency Response', 'Incident Management', 'Campus Dispatch', 'Tactical Operations', 'Distributed Systems'],
+  openGraph: {
+    title: 'SentinelX Platform',
+    description: 'Distributed incident response and campus dispatch operations center',
+    type: 'website',
+  },
 };
 
 export default function RootLayout({
