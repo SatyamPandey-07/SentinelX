@@ -38,7 +38,11 @@ function getToken(): string | null {
   return localStorage.getItem('sentinelx_token');
 }
 
-async function request<T>(path: string, options: RequestInit = {}, base = API_BASE): Promise<T> {
+export interface RequestOptions extends RequestInit {
+  timeoutMs?: number;
+}
+
+async function request<T>(path: string, options: RequestOptions = {}, base = API_BASE): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -46,7 +50,17 @@ async function request<T>(path: string, options: RequestInit = {}, base = API_BA
   };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const res = await fetch(`${base}${path}`, { ...options, headers });
+  const { timeoutMs, signal: userSignal, ...fetchOptions } = options;
+  const controller = typeof AbortController !== 'undefined' && !userSignal ? new AbortController() : null;
+  const timeoutId = controller && timeoutMs ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  const signal = userSignal || controller?.signal;
+
+  let res: Response;
+  try {
+    res = await fetch(`${base}${path}`, { ...fetchOptions, headers, signal });
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
 
   if (res.status === 401 && typeof window !== 'undefined') {
     localStorage.removeItem('sentinelx_token');
