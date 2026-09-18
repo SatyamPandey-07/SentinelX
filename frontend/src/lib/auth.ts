@@ -255,6 +255,9 @@ export function persistSession(session: AuthSession): void {
   window.dispatchEvent(new Event('sentinelx_auth_change'));
 }
 
+/**
+ * Clears active tokens and user profile from client storage, dispatching auth change event.
+ */
 export function clearSession(): void {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(TOKEN_KEY);
@@ -263,6 +266,14 @@ export function clearSession(): void {
   window.dispatchEvent(new Event('sentinelx_auth_change'));
 }
 
+/**
+ * Switches the current session's role with strict RBAC guardrails.
+ * Only authenticated Super Admins are authorized to switch to ROLE_ADMIN.
+ *
+ * @param newRole Target user role ('ROLE_USER' | 'ROLE_ADMIN')
+ * @returns Updated AuthSession, or null if no session exists
+ * @throws Error if unauthorized user attempts role escalation
+ */
 export function switchRole(newRole: UserRole): AuthSession | null {
   const current = getSession();
   if (!current) return null;
@@ -277,6 +288,9 @@ export function switchRole(newRole: UserRole): AuthSession | null {
   return updated;
 }
 
+/**
+ * Retrieves client-side fallback registered users dictionary.
+ */
 export function getLocalRegisteredUsers(): Record<string, { password: string; session: AuthSession }> {
   if (typeof window === 'undefined') return {};
   try {
