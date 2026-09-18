@@ -504,7 +504,7 @@ export async function authenticate(usernameOrEmail: string, password: string): P
 export async function registerUser(payload: RegisterPayload): Promise<AuthSession> {
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
 
-  // Strict RBAC: All endless users are strictly ROLE_USER. Only a named Super Admin can be ROLE_ADMIN.
+  // Strict RBAC: All standard end-users are strictly ROLE_USER. Only a named Super Admin can be ROLE_ADMIN.
   const regSuperAdmin = resolveSuperAdminIdentity(payload.email, payload.username);
   const assignedRole: UserRole = regSuperAdmin ? 'ROLE_ADMIN' : 'ROLE_USER';
 
