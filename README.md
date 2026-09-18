@@ -72,9 +72,9 @@ SentinelX adopts a **Database-Per-Service** microservices architecture connected
 | **Incident Service**| Spring Boot, JPA, Flyway | 8082 | Incident lifecycle, optimistic locking, Transactional Outbox pattern | PostgreSQL (`sentinelx_incident`) |
 | **Assignment Service**| Spring Boot, Redisson | 8083 | Multi-factor scoring, Redis `SETNX` distributed mutex lock on responders | Ephemeral (gRPC to Location) |
 | **Location Service**| Spring Boot, gRPC | 8084 / 9094 | Geospatial calculations (Haversine/PostGIS), responder GPS tracking | PostgreSQL (`sentinelx_location`) |
-| **Realtime Service**| Spring Boot, STOMP | 8085 | WebSocket push to dispatcher dashboard (`/topic/incidents`, `/topic/sla`) | In-memory Relay |
+| **SLA Service**| Spring Boot, Redis | 8085 | SLA timer evaluation via Redis Sorted Sets (`ZSET`), warning/breach events | Redis (`sla:deadlines`) |
 | **Search Service**| Spring Boot, OpenSearch | 8086 | Full-text indexing, spatial-temporal-textual duplicate incident detection | OpenSearch 2.x |
-| **SLA Service**| Spring Boot, Redis | 8087 | SLA timer evaluation via Redis Sorted Sets (`ZSET`), warning/breach events | Redis (`sla:deadlines`) |
+| **Realtime Service**| Spring Boot, STOMP | 8087 | WebSocket push to dispatcher dashboard (`/topic/incidents`, `/topic/sla`) | In-memory Relay |
 | **Notification Svc**| Spring Boot, JavaMail | 8088 | Multi-channel alerting (email, SMS, push) with Kafka Dead Letter Queue (DLQ) | Ephemeral / MailHog |
 | **Analytics Svc**| Spring Boot, Redis Cache | 8089 | Real-time calculation of P95, median, MTTA, MTTR, category breakdowns | PostgreSQL (`sentinelx_analytics`), Redis |
 | **Audit Service**| Spring Boot, SHA-256 | 8090 | Append-only cryptographically hash-chained audit ledger | PostgreSQL (`sentinelx_audit`) |
