@@ -221,6 +221,13 @@ export function getSession(): AuthSession | null {
   }
 }
 
+/**
+ * Checks whether an active authentication session exists in client storage.
+ */
+export function isAuthenticated(): boolean {
+  return getSession() !== null;
+}
+
 export function persistSession(session: AuthSession): void {
   if (typeof window === 'undefined') return;
 
