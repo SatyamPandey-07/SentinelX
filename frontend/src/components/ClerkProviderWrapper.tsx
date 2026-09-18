@@ -9,9 +9,10 @@ const CLERK_CONFIGURED = Boolean(
   PUBLISHABLE_KEY && (PUBLISHABLE_KEY.startsWith('pk_test_') || PUBLISHABLE_KEY.startsWith('pk_live_'))
 );
 
-const ClerkConfiguredContext = createContext(false);
+const ClerkConfiguredContext = createContext<boolean>(false);
+ClerkConfiguredContext.displayName = 'ClerkConfiguredContext';
 
-export function useClerkConfigured() {
+export function useClerkConfigured(): boolean {
   return useContext(ClerkConfiguredContext);
 }
 
