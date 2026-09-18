@@ -33,6 +33,13 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Type guard to check if an unknown caught error is an ApiError.
+ */
+export function isApiError(err: unknown): err is ApiError {
+  return err instanceof ApiError || (err instanceof Error && 'status' in err && typeof (err as unknown as ApiError).status === 'number');
+}
+
 function getToken(): string | null {
   if (typeof window === 'undefined') return null;
   return localStorage.getItem('sentinelx_token');
