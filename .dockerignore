@@ -17,3 +17,8 @@ infrastructure/kubernetes/
 *.md
 .env
 .env.*
+.idea/
+.vscode/
+*.log
+.coverage
+htmlcov/
