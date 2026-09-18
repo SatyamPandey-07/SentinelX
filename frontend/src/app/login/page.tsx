@@ -501,6 +501,7 @@ function LoginContent() {
                     id="signup-first-name"
                     type="text"
                     required
+                    autoComplete="given-name"
                     placeholder="Alex"
                     value={suFirstName}
                     onChange={(e) => setSuFirstName(e.target.value)}
@@ -513,6 +514,7 @@ function LoginContent() {
                     id="signup-last-name"
                     type="text"
                     required
+                    autoComplete="family-name"
                     placeholder="Reynolds"
                     value={suLastName}
                     onChange={(e) => setSuLastName(e.target.value)}
@@ -532,6 +534,7 @@ function LoginContent() {
                     required
                     minLength={3}
                     maxLength={32}
+                    autoComplete="username"
                     placeholder="username or student id"
                     value={suUsername}
                     onChange={(e) => setSuUsername(e.target.value)}
@@ -549,6 +552,7 @@ function LoginContent() {
                     id="signup-email"
                     type="email"
                     required
+                    autoComplete="email"
                     placeholder="user@campus.edu"
                     value={suEmail}
                     onChange={(e) => setSuEmail(e.target.value)}
@@ -568,6 +572,7 @@ function LoginContent() {
                       type={showPassword ? 'text' : 'password'}
                       required
                       minLength={8}
+                      autoComplete="new-password"
                       placeholder="••••••••"
                       value={suPassword}
                       onChange={(e) => setSuPassword(e.target.value)}
