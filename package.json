@@ -1,5 +1,12 @@
 {
-  "dependencies": {
-    "@clerk/nextjs": "^7.9.4"
+  "name": "sentinelx-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SentinelX: Distributed Intelligent Emergency & Incident Response Platform",
+  "scripts": {
+    "dev": "npm run dev --prefix frontend",
+    "build": "npm run build --prefix frontend",
+    "lint": "npm run lint --prefix frontend",
+    "typecheck": "npx tsc --noEmit --project frontend/tsconfig.json"
   }
 }
