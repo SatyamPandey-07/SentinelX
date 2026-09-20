@@ -106,7 +106,11 @@ export default function SlaMonitorPage() {
 
               <div className="pt-3 border-t border-white/[0.08] flex items-center justify-between text-[10px] font-mono text-slate-400">
                 <span>{breached} breached</span>
-                <span className={breached > 0 ? 'text-red-400' : 'text-emerald-400'}>
+                <span
+                  role="status"
+                  aria-label={`SLA status for ${t.tier}: ${breached > 0 ? `${breached} breached, attention required` : 'nominal'}`}
+                  className={breached > 0 ? 'text-red-400' : 'text-emerald-400'}
+                >
                   {breached > 0 ? 'ATTENTION' : 'NOMINAL'}
                 </span>
               </div>
@@ -123,9 +127,9 @@ export default function SlaMonitorPage() {
         </span>
 
         {loading ? (
-          <div className="flex items-center justify-center py-8 text-slate-400 font-mono text-sm gap-2">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            LOADING...
+          <div role="status" aria-live="polite" className="flex items-center justify-center py-8 text-slate-400 font-mono text-sm gap-2">
+            <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+            <span>LOADING...</span>
           </div>
         ) : incidents.length === 0 ? (
           <p className="text-slate-500 font-mono text-sm py-4">No open incidents with active SLA timers.</p>
