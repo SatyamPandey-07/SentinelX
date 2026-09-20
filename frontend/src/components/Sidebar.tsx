@@ -61,7 +61,7 @@ export function Sidebar() {
 
   const handleLogout = () => {
     clearSession();
-    router.push('/login?mode=signup');
+    router.push('/login?mode=signin');
   };
 
   return (

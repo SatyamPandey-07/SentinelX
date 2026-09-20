@@ -69,12 +69,8 @@ async function request<T>(path: string, options: RequestOptions = {}, base = API
     if (timeoutId) clearTimeout(timeoutId);
   }
 
-  if (res.status === 401 && typeof window !== 'undefined') {
-    localStorage.removeItem('sentinelx_token');
-    localStorage.removeItem('sentinelx_refresh_token');
-    localStorage.removeItem('sentinelx_user');
-    window.location.href = '/login';
-    throw new ApiError('Unauthorized', 401);
+  if (res.status === 401) {
+    throw new ApiError('Unauthorized (401)', 401);
   }
 
   if (res.status === 204) return undefined as T;

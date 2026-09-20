@@ -56,7 +56,11 @@ export function useRequireAuth(enabled: boolean) {
           setSession(finalCheck);
           setValidated(true);
         } else {
-          router.replace('/login?mode=signup');
+          const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+          const redirectParam = currentPath && currentPath !== '/' && !currentPath.startsWith('/login')
+            ? `&redirect=${encodeURIComponent(currentPath)}`
+            : '';
+          router.replace(`/login?mode=signin${redirectParam}`);
         }
       }
     }, 1200);

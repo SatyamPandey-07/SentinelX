@@ -33,7 +33,7 @@ function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const initialMode = (searchParams.get('mode') as ViewMode) || 'signup';
+  const initialMode = (searchParams.get('mode') as ViewMode) || 'signin';
   const initialRole = (searchParams.get('role')?.toUpperCase() as RoleChoice) || 'USER';
 
   const [mode, setMode] = useState<ViewMode>(initialMode);
@@ -79,7 +79,14 @@ function LoginContent() {
     // dashboard/user default -- only ever a same-origin relative path, to
     // rule out an open redirect via a crafted `redirect` query value.
     const redirect = searchParams.get('redirect');
-    if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) {
+    if (
+      redirect &&
+      redirect.startsWith('/') &&
+      !redirect.startsWith('//') &&
+      !redirect.startsWith('/login') &&
+      !redirect.startsWith('/sign-in') &&
+      !redirect.startsWith('/sign-up')
+    ) {
       router.push(redirect);
       return;
     }

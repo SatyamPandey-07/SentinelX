@@ -89,7 +89,7 @@ export default function ProfilePage() {
 
   const handleLogout = () => {
     clearSession();
-    router.push('/login?mode=signup');
+    router.push('/login?mode=signin');
   };
 
   const handleRoleChange = (emailOrUsername: string, newRole: UserRole, secondaryEmail?: string) => {
