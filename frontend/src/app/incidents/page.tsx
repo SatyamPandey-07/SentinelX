@@ -127,9 +127,9 @@ export default function IncidentsPage() {
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-mono">
-          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-          {error}
+        <div role="alert" aria-live="assertive" className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-mono">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+          <span>{error}</span>
         </div>
       )}
 
@@ -142,14 +142,25 @@ export default function IncidentsPage() {
               TRIAGE QUERY ENGINE
             </span>
             <div className="relative">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" aria-hidden="true" />
               <input
                 type="text"
+                aria-label="Search incident records by ID, keyword, hazard, or building"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search incident ID, keyword, hazard, building..."
-                className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono"
+                className="w-full pl-9 pr-8 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono"
               />
+              {searchQuery && (
+                <button
+                  type="button"
+                  aria-label="Clear search query"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" aria-hidden="true" />
+                </button>
+              )}
             </div>
           </div>
 
@@ -178,11 +189,11 @@ export default function IncidentsPage() {
               DUP DETECTION
             </span>
             <p className="text-[11px] text-slate-300">
-              Spatial proximity &le; 150m, temporal delta &le; 10m, text cosine &ge; 0.70.
+              Cosine vector similarity &gt; 0.85 alerts dispatcher to duplicate submissions.
             </p>
           </div>
           <div className="pt-2 border-t border-cyan-950/60 text-[10px] font-mono text-cyan-400">
-            search-service / OpenSearch
+            search-service / OpenSearch 2.x
           </div>
         </div>
 
@@ -204,9 +215,9 @@ export default function IncidentsPage() {
 
       {/* Incident Stream */}
       {loading ? (
-        <div className="flex items-center justify-center py-16 text-slate-400 font-mono text-sm gap-2">
-          <Loader2 className="w-4 h-4 animate-spin" />
-          LOADING INCIDENTS...
+        <div role="status" aria-live="polite" className="flex items-center justify-center py-16 text-slate-400 font-mono text-sm gap-2">
+          <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+          <span>LOADING INCIDENTS...</span>
         </div>
       ) : filtered.length === 0 ? (
         <div className="bento-card text-center py-12 text-slate-400 font-mono text-sm">

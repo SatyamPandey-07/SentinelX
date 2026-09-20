@@ -26,14 +26,49 @@ export function useRequireAuth(enabled: boolean) {
       return;
     }
 
-    const current = getSession();
-    if (!current) {
-      router.replace('/login?mode=signup');
+    // 1. If session is already available in localStorage, validate immediately
+    const existing = getSession();
+    if (existing) {
+      setSession(existing);
+      setValidated(true);
       return;
     }
 
-    setSession(current);
-    setValidated(true);
+    // 2. If no session yet, wait for OAuth/Clerk session hydration before bouncing
+    let resolved = false;
+
+    const handleAuthChange = () => {
+      const cur = getSession();
+      if (cur) {
+        resolved = true;
+        setSession(cur);
+        setValidated(true);
+      }
+    };
+
+    window.addEventListener('sentinelx_auth_change', handleAuthChange);
+
+    // Failsafe timer: give OAuth / Clerk provider 1200ms to hydrate session
+    const timer = setTimeout(() => {
+      if (!resolved) {
+        const finalCheck = getSession();
+        if (finalCheck) {
+          setSession(finalCheck);
+          setValidated(true);
+        } else {
+          const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+          const redirectParam = currentPath && currentPath !== '/' && !currentPath.startsWith('/login')
+            ? `&redirect=${encodeURIComponent(currentPath)}`
+            : '';
+          router.replace(`/login?mode=signin${redirectParam}`);
+        }
+      }
+    }, 1200);
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('sentinelx_auth_change', handleAuthChange);
+    };
   }, [enabled, router]);
 
   return {

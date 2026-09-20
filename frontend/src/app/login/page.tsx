@@ -23,7 +23,8 @@ import {
   Info,
 } from 'lucide-react';
 import { authenticate, registerUser, persistSession, AuthSession, isSuperAdmin, SUPER_ADMINS } from '@/lib/auth';
-import { useSafeSignIn } from '@/components/ClerkGate';
+import { useSafeAuth } from '@/components/ClerkGate';
+import { useClerkConfigured } from '@/components/ClerkProviderWrapper';
 
 type ViewMode = 'signup' | 'signin';
 type RoleChoice = 'USER' | 'ADMIN';
@@ -32,7 +33,7 @@ function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const initialMode = (searchParams.get('mode') as ViewMode) || 'signup';
+  const initialMode = (searchParams.get('mode') as ViewMode) || 'signin';
   const initialRole = (searchParams.get('role')?.toUpperCase() as RoleChoice) || 'USER';
 
   const [mode, setMode] = useState<ViewMode>(initialMode);
@@ -78,7 +79,14 @@ function LoginContent() {
     // dashboard/user default -- only ever a same-origin relative path, to
     // rule out an open redirect via a crafted `redirect` query value.
     const redirect = searchParams.get('redirect');
-    if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) {
+    if (
+      redirect &&
+      redirect.startsWith('/') &&
+      !redirect.startsWith('//') &&
+      !redirect.startsWith('/login') &&
+      !redirect.startsWith('/sign-in') &&
+      !redirect.startsWith('/sign-up')
+    ) {
       router.push(redirect);
       return;
     }
@@ -141,36 +149,97 @@ function LoginContent() {
     }
   };
 
-  const { signIn, bridge: clerkSignInBridge } = useSafeSignIn();
+  const { clerk, signIn, signUp, bridge: clerkAuthBridge } = useSafeAuth();
+  const clerkConfigured = useClerkConfigured();
 
   // Clean Social Login (Google / Gmail & GitHub)
   const handleSocialAuth = async (provider: 'google' | 'github') => {
     setSocialLoading(provider);
     setError(null);
 
-    // If Clerk signIn is loaded, trigger Clerk OAuth redirect
-    if (signIn) {
+    const targetRedirect = selectedRole === 'ADMIN' ? '/dashboard' : '/user';
+    localStorage.setItem('sentinelx_pending_role', selectedRole === 'ADMIN' ? 'ROLE_ADMIN' : 'ROLE_USER');
+    const strategy = provider === 'google' ? 'oauth_google' : 'oauth_github';
+
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const redirectUrl = `${origin}/sso-callback`;
+    const redirectUrlComplete = `${origin}${targetRedirect}`;
+
+    // 1. If Clerk is configured on this deployment, trigger real OAuth redirect
+    if (clerkConfigured) {
       try {
-        localStorage.setItem('sentinelx_pending_role', selectedRole === 'ADMIN' ? 'ROLE_ADMIN' : 'ROLE_USER');
-        await signIn.authenticateWithRedirect({
-          strategy: provider === 'google' ? 'oauth_google' : 'oauth_github',
-          redirectUrl: '/sso-callback',
-          redirectUrlComplete: selectedRole === 'ADMIN' ? '/dashboard' : '/user',
-        });
+        let activeClerk = clerk || (typeof window !== 'undefined' ? (window as any).Clerk : null);
+
+        // Wait up to 2 seconds for Clerk to hydrate if user clicked right upon load
+        if (!activeClerk?.loaded) {
+          for (let i = 0; i < 20; i++) {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+            activeClerk = clerk || (typeof window !== 'undefined' ? (window as any).Clerk : null);
+            if (activeClerk?.loaded) break;
+          }
+        }
+
+        // Canonical top-level authenticateWithRedirect handles both sign-in & sign-up
+        if (activeClerk?.authenticateWithRedirect) {
+          try {
+            await activeClerk.authenticateWithRedirect({
+              strategy,
+              redirectUrl,
+              redirectUrlComplete,
+              continueSignUp: true,
+            });
+            return;
+          } catch (clerkErr) {
+            console.warn('Clerk top-level authenticateWithRedirect threw, attempting fallback:', clerkErr);
+          }
+        }
+
+        // Fallback to signIn with continueSignUp
+        if (signIn?.authenticateWithRedirect) {
+          try {
+            await signIn.authenticateWithRedirect({
+              strategy,
+              redirectUrl,
+              redirectUrlComplete,
+              continueSignUp: true,
+            });
+            return;
+          } catch (signInErr) {
+            console.warn('Clerk signIn.authenticateWithRedirect threw:', signInErr);
+          }
+        }
+
+        // Fallback to signUp
+        if (signUp?.authenticateWithRedirect) {
+          try {
+            await signUp.authenticateWithRedirect({
+              strategy,
+              redirectUrl,
+              redirectUrlComplete,
+            });
+            return;
+          } catch (signUpErr) {
+            console.warn('Clerk signUp.authenticateWithRedirect threw:', signUpErr);
+          }
+        }
+
+        // Real Clerk OAuth redirect failed
+        setError('Google sign-in was unable to redirect. Please disable popup/redirect blockers or authenticate using your credentials.');
+        setSocialLoading(null);
         return;
-      } catch (clerkErr) {
-        console.warn('Clerk OAuth initiated, fallback if running local mock:', clerkErr);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Google OAuth redirect failed';
+        setError(`OAuth Error: ${msg}`);
+        setSocialLoading(null);
+        return;
       }
     }
 
-    // High fidelity fallback simulation: Never outputs ugly `google_user_414`!
+    // 2. High fidelity fallback simulation (ONLY for offline/unconfigured CI environments without Clerk keys)
     setTimeout(() => {
       let session: AuthSession;
 
       if (selectedRole === 'ADMIN') {
-        // This is a simulated OAuth session (real Clerk auth didn't fire),
-        // so there's no real identity to resolve -- default to the first
-        // named Super Admin, same as the rest of the admin demo fallbacks.
         const admin = SUPER_ADMINS[0];
         session = {
           access_token: `oauth-superadmin-${Date.now()}`,
@@ -183,7 +252,6 @@ function LoginContent() {
           email: admin.email,
         };
       } else {
-        // Endless Campus User identity
         session = {
           access_token: `oauth-user-${Date.now()}`,
           refresh_token: `oauth-refresh-${Date.now()}`,
@@ -220,7 +288,7 @@ function LoginContent() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-[#060911]">
-      {clerkSignInBridge}
+      {clerkAuthBridge}
       {/* Tactical Glow Elements */}
       <div className="absolute inset-0 opacity-[0.25] bg-[radial-gradient(#38bdf8_1px,transparent_1px)] [background-size:26px_26px]" />
       <motion.div
@@ -440,6 +508,7 @@ function LoginContent() {
                     id="signup-first-name"
                     type="text"
                     required
+                    autoComplete="given-name"
                     placeholder="Alex"
                     value={suFirstName}
                     onChange={(e) => setSuFirstName(e.target.value)}
@@ -452,6 +521,7 @@ function LoginContent() {
                     id="signup-last-name"
                     type="text"
                     required
+                    autoComplete="family-name"
                     placeholder="Reynolds"
                     value={suLastName}
                     onChange={(e) => setSuLastName(e.target.value)}
@@ -471,6 +541,7 @@ function LoginContent() {
                     required
                     minLength={3}
                     maxLength={32}
+                    autoComplete="username"
                     placeholder="username or student id"
                     value={suUsername}
                     onChange={(e) => setSuUsername(e.target.value)}
@@ -488,6 +559,7 @@ function LoginContent() {
                     id="signup-email"
                     type="email"
                     required
+                    autoComplete="email"
                     placeholder="user@campus.edu"
                     value={suEmail}
                     onChange={(e) => setSuEmail(e.target.value)}
@@ -507,6 +579,7 @@ function LoginContent() {
                       type={showPassword ? 'text' : 'password'}
                       required
                       minLength={8}
+                      autoComplete="new-password"
                       placeholder="••••••••"
                       value={suPassword}
                       onChange={(e) => setSuPassword(e.target.value)}

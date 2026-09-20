@@ -1,4 +1,4 @@
-.PHONY: help dev down test build clean integration-test chaos-test docker-build k8s-validate k8s-dev k8s-prod
+.PHONY: help dev down test build clean integration-test chaos-test docker-build k8s-validate k8s-dev k8s-prod frontend-dev frontend-build frontend-typecheck
 
 JAVA_SERVICES := api-gateway auth-service incident-service assignment-service location-service sla-service search-service realtime-service notification-service analytics-service audit-service
 
@@ -9,6 +9,9 @@ help:
 	@echo "make down             - Stop all Docker Compose services"
 	@echo "make build            - Compile all Java modules and build packages"
 	@echo "make test             - Run unit tests across Java and Python services"
+	@echo "make frontend-dev     - Start Next.js frontend development server"
+	@echo "make frontend-build   - Build Next.js frontend for production"
+	@echo "make frontend-typecheck - Run TypeScript typecheck on frontend"
 	@echo "make integration-test - Run end-to-end integration tests"
 	@echo "make chaos-test       - Execute resilience and chaos engineering script"
 	@echo "make docker-build     - Build every service's Docker image (12 images)"
@@ -34,6 +37,15 @@ build:
 test:
 	mvn test
 	pytest services/ai-service/tests
+
+frontend-dev:
+	npm run dev --prefix frontend
+
+frontend-build:
+	npm run build --prefix frontend
+
+frontend-typecheck:
+	npx tsc --noEmit --project frontend/tsconfig.json
 
 integration-test:
 	python tests/e2e/test_incident_lifecycle.py

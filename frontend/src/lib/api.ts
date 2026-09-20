@@ -33,12 +33,23 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Type guard to check if an unknown caught error is an ApiError.
+ */
+export function isApiError(err: unknown): err is ApiError {
+  return err instanceof ApiError || (err instanceof Error && 'status' in err && typeof (err as unknown as ApiError).status === 'number');
+}
+
 function getToken(): string | null {
   if (typeof window === 'undefined') return null;
   return localStorage.getItem('sentinelx_token');
 }
 
-async function request<T>(path: string, options: RequestInit = {}, base = API_BASE): Promise<T> {
+export interface RequestOptions extends RequestInit {
+  timeoutMs?: number;
+}
+
+async function request<T>(path: string, options: RequestOptions = {}, base = API_BASE): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -46,14 +57,20 @@ async function request<T>(path: string, options: RequestInit = {}, base = API_BA
   };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const res = await fetch(`${base}${path}`, { ...options, headers });
+  const { timeoutMs, signal: userSignal, ...fetchOptions } = options;
+  const controller = typeof AbortController !== 'undefined' && !userSignal ? new AbortController() : null;
+  const timeoutId = controller && timeoutMs ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  const signal = userSignal || controller?.signal;
 
-  if (res.status === 401 && typeof window !== 'undefined') {
-    localStorage.removeItem('sentinelx_token');
-    localStorage.removeItem('sentinelx_refresh_token');
-    localStorage.removeItem('sentinelx_user');
-    window.location.href = '/login';
-    throw new ApiError('Unauthorized', 401);
+  let res: Response;
+  try {
+    res = await fetch(`${base}${path}`, { ...fetchOptions, headers, signal });
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+
+  if (res.status === 401) {
+    throw new ApiError('Unauthorized (401)', 401);
   }
 
   if (res.status === 204) return undefined as T;
@@ -203,6 +220,9 @@ export function getMe() {
 // Incidents
 // ---------------------------------------------------------------------
 
+/**
+ * Fetches a paginated collection of incidents filtered by status, severity, or category.
+ */
 export function listIncidents(params?: { status?: string; severity?: string; category?: string; size?: number; sort?: string }) {
   const qs = new URLSearchParams();
   if (params?.status) qs.set('status', params.status);
@@ -213,10 +233,16 @@ export function listIncidents(params?: { status?: string; severity?: string; cat
   return request<Page<Incident>>(`/api/v1/incidents?${qs.toString()}`);
 }
 
+/**
+ * Fetches detailed incident data by unique incident ID.
+ */
 export function getIncident(id: string) {
   return request<Incident>(`/api/v1/incidents/${id}`);
 }
 
+/**
+ * Creates a new emergency incident record with an idempotent submission key.
+ */
 export function createIncident(input: {
   title: string;
   description: string;
@@ -231,10 +257,16 @@ export function createIncident(input: {
   });
 }
 
+/**
+ * Acknowledges an assigned incident, transitioning state to ACKNOWLEDGED.
+ */
 export function acknowledgeIncident(id: string) {
   return request<Incident>(`/api/v1/incidents/${id}/acknowledge`, { method: 'POST' });
 }
 
+/**
+ * Resolves an active incident with optional operational resolution notes.
+ */
 export function resolveIncident(id: string, notes?: string) {
   return request<Incident>(`/api/v1/incidents/${id}/resolve`, {
     method: 'POST',

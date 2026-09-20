@@ -51,9 +51,10 @@ export default function RespondersPage() {
         </div>
 
         <div className="relative w-full sm:w-72">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" aria-hidden="true" />
           <input
             type="text"
+            aria-label="Filter responder units by callsign or skill certification"
             placeholder="Search responder or skill..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -146,11 +147,15 @@ export default function RespondersPage() {
                 </div>
               </div>
 
-              <span className={`text-[10px] px-2.5 py-0.5 rounded font-mono font-bold uppercase ${
-                r.status === 'AVAILABLE' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
-                r.status === 'EN_ROUTE' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' :
-                'bg-purple-500/20 text-purple-400 border border-purple-500/30'
-              }`}>
+              <span
+                role="status"
+                aria-label={`Operational status: ${r.status}`}
+                className={`text-[10px] px-2.5 py-0.5 rounded font-mono font-bold uppercase ${
+                  r.status === 'AVAILABLE' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+                  r.status === 'EN_ROUTE' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' :
+                  'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                }`}
+              >
                 {r.status}
               </span>
             </div>

@@ -1,5 +1,5 @@
 import './globals.css';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Sora, JetBrains_Mono } from 'next/font/google';
 import { AppShell } from '@/components/AppShell';
 import { ClerkProviderWrapper } from '@/components/ClerkProviderWrapper';
@@ -18,9 +18,21 @@ const jetbrainsMono = JetBrains_Mono({
   display: 'swap',
 });
 
+export const viewport: Viewport = {
+  themeColor: '#060911',
+  width: 'device-width',
+  initialScale: 1,
+};
+
 export const metadata: Metadata = {
   title: 'SentinelX | Distributed Emergency Operations & 3D Defense Platform',
   description: 'Mission-critical distributed incident response and tactical campus dispatch platform with 3D defense grid',
+  keywords: ['SentinelX', 'Emergency Response', 'Incident Management', 'Campus Dispatch', 'Tactical Operations', 'Distributed Systems'],
+  openGraph: {
+    title: 'SentinelX Platform',
+    description: 'Distributed incident response and campus dispatch operations center',
+    type: 'website',
+  },
 };
 
 export default function RootLayout({

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AuthenticateWithRedirectCallback, useUser } from '@clerk/nextjs';
 import { persistSession, AuthSession, isSuperAdmin } from '@/lib/auth';
@@ -10,18 +10,6 @@ import { useClerkConfigured } from '@/components/ClerkProviderWrapper';
 // Clerk -- it must never be statically prerendered.
 export const dynamic = 'force-dynamic';
 
-// `force-dynamic` alone isn't enough: Next.js still performs a build-time
-// SSR pass of 'use client' pages to produce their initial HTML shell, and
-// in CI (no NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY set) ClerkProviderWrapper
-// correctly skips mounting <ClerkProvider> -- so useUser(), called
-// directly in this component, threw "can only be used within a
-// <ClerkProvider>" during that pass and failed the build (reproduced
-// live in CI; a local build with a real key set never hits this path,
-// which is why an earlier fix here looked correct but wasn't). The actual
-// fix: isolate the Clerk-dependent hook in a child component that only
-// ever mounts once useClerkConfigured() confirms a real <ClerkProvider>
-// exists, so useUser() is never called without one -- same pattern as
-// ClerkGate.tsx's SafeSignedIn/SafeSignedOut/SafeUserButton.
 export default function SSOCallbackPage() {
   const configured = useClerkConfigured();
 
@@ -39,19 +27,27 @@ export default function SSOCallbackPage() {
 function SSOCallbackInner() {
   const router = useRouter();
   const { user, isLoaded } = useUser();
+  const [timedOut, setTimedOut] = useState(false);
 
   useEffect(() => {
-    if (!isLoaded) return;
-    if (user) {
+    const timer = setTimeout(() => {
+      setTimedOut(true);
+    }, 3500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const pendingRole = typeof window !== 'undefined' ? localStorage.getItem('sentinelx_pending_role') : null;
+
+    if (isLoaded && user) {
       const email = user.primaryEmailAddress?.emailAddress?.toLowerCase() || '';
       const usernameCandidate = user.username || '';
-      const isAfifa = isSuperAdmin(email, usernameCandidate);
+      const isSuper = isSuperAdmin(email, usernameCandidate);
 
-      // Strict RBAC: Only Super Admin Afifa gets ROLE_ADMIN. All other endless users get ROLE_USER.
-      const assignedRole = isAfifa ? 'ROLE_ADMIN' : 'ROLE_USER';
-      const cleanUsername = isAfifa ? 'Afifa' : (user.username || user.firstName || email.split('@')[0] || 'campus_user');
-      const firstName = isAfifa ? 'Afifa' : (user.firstName || 'Campus');
-      const lastName = isAfifa ? 'Syed' : (user.lastName || 'Member');
+      const assignedRole = (isSuper || pendingRole === 'ROLE_ADMIN') ? 'ROLE_ADMIN' : 'ROLE_USER';
+      const cleanUsername = isSuper ? 'Afifa' : (user.username || user.firstName || email.split('@')[0] || 'campus_user');
+      const firstName = isSuper ? 'Afifa' : (user.firstName || 'Campus');
+      const lastName = isSuper ? 'Syed' : (user.lastName || 'Member');
 
       const session: AuthSession = {
         access_token: `clerk-token-${user.id}`,
@@ -61,17 +57,32 @@ function SSOCallbackInner() {
         user_id: user.id,
         first_name: firstName,
         last_name: lastName,
-        email: user.primaryEmailAddress?.emailAddress || (isAfifa ? 'afifasyed06@gmail.com' : `${cleanUsername}@campus.edu`),
+        email: user.primaryEmailAddress?.emailAddress || (isSuper ? 'afifasyed06@gmail.com' : `${cleanUsername}@campus.edu`),
       };
 
       persistSession(session);
       router.replace(assignedRole === 'ROLE_ADMIN' ? '/dashboard' : '/user');
+      return;
     }
-  }, [user, isLoaded, router]);
+
+    if (timedOut) {
+      const target = pendingRole === 'ROLE_ADMIN' ? '/dashboard' : '/user';
+      router.replace(target);
+    }
+  }, [user, isLoaded, timedOut, router]);
+
+  const pendingRole = typeof window !== 'undefined' ? localStorage.getItem('sentinelx_pending_role') : null;
+  const targetRedirect = pendingRole === 'ROLE_ADMIN' ? '/dashboard' : '/user';
 
   return (
     <div className="min-h-screen bg-[#060911] flex flex-col items-center justify-center text-xs font-mono text-cyan-400 space-y-3">
-      <AuthenticateWithRedirectCallback />
+      <AuthenticateWithRedirectCallback
+        signInForceRedirectUrl={targetRedirect}
+        signUpForceRedirectUrl={targetRedirect}
+        signInFallbackRedirectUrl={targetRedirect}
+        signUpFallbackRedirectUrl={targetRedirect}
+        continueSignUpUrl="/sso-callback"
+      />
       <p>AUTHENTICATING VIA CLERK OAUTH...</p>
     </div>
   );

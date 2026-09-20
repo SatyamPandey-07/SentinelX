@@ -80,9 +80,9 @@ export default function SettingsPage() {
         </h2>
 
         {loading ? (
-          <div className="flex items-center justify-center py-8 text-slate-400 font-mono text-sm gap-2">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            PROBING SERVICES...
+          <div role="status" aria-live="polite" className="flex items-center justify-center py-8 text-slate-400 font-mono text-sm gap-2">
+            <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+            <span>PROBING SERVICES...</span>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -93,9 +93,12 @@ export default function SettingsPage() {
                 <div key={name} className="p-3.5 rounded-xl bg-surface border border-border space-y-2 text-xs font-mono">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-slate-100">{name}</span>
-                    <span className={`text-[9px] px-1.5 py-0.5 rounded border ${
-                      up ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-red-500/20 text-red-400 border-red-500/30'
-                    }`}>
+                    <span
+                      aria-label={`Service ${name} status: ${up ? 'healthy' : 'unreachable'}`}
+                      className={`text-[9px] px-1.5 py-0.5 rounded border ${
+                        up ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-red-500/20 text-red-400 border-red-500/30'
+                      }`}
+                    >
                       {up ? 'HEALTHY' : 'UNREACHABLE'}
                     </span>
                   </div>

@@ -53,10 +53,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="bg-background text-slate-100 min-h-screen flex flex-col">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-cyan-600 focus:text-white focus:rounded-md focus:shadow-lg"
+      >
+        Skip to main content
+      </a>
       <Navbar />
       <div className="flex flex-1">
         <Sidebar />
-        <main className="flex-1 p-6 overflow-y-auto max-h-[calc(100vh-4rem)] relative">
+        <main id="main-content" className="flex-1 p-6 overflow-y-auto max-h-[calc(100vh-4rem)] relative">
           <div
             aria-hidden
             className="pointer-events-none fixed inset-0 left-64 top-16 -z-10 opacity-[0.4]"

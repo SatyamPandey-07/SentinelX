@@ -396,7 +396,10 @@ export default function UserPortalPage() {
                   className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800/80 hover:border-slate-700 transition-colors space-y-2"
                 >
                   <div className="flex items-center justify-between text-[11px] font-mono">
-                    <span className="font-bold text-slate-200">{item.id}</span>
+                    <span className="font-bold text-cyan-300 flex items-center gap-1">
+                      <span className="text-slate-500 font-normal text-[10px]">TICKET</span>
+                      <span>#INC-{item.id.slice(0, 8).toUpperCase()}</span>
+                    </span>
                     <span
                       className={`px-2 py-0.5 rounded-full font-semibold text-[10px] ${
                         item.severity === 'CRITICAL'
